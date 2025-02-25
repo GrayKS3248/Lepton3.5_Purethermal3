@@ -26,10 +26,11 @@ if __name__ == "__main__":
     # Do other things while Lepton is streaming
     prev_frame = -1
     while lepton.is_streaming():
-        frame = lepton.get_frame_number()
-        if frame > prev_frame:
-            print("Frame {} @ {:.3f}s".format(frame, lepton.get_time()))
-        prev_frame = frame
+        curr_frame = lepton.get_frame_number()
+        curr_time = lepton.get_time()
+        if curr_frame > prev_frame and not curr_time is None:
+            print("Frame {} @ {:.3f}s".format(curr_frame, curr_time))
+        prev_frame = curr_frame
         time.sleep(0.01) # Remove some CPU stress
         
     # Join the Lepton thread
