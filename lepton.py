@@ -40,7 +40,7 @@ def _parse_args():
                         type=int, default=0)
     parser.add_argument('-r', "--record", help="record data stream", 
                         action=argparse.BooleanOptionalAction, default=False)
-    parser.add_argument('-n', "--name", help="name of recording file", 
+    parser.add_argument('-n', "--name", help="name of saved video file", 
                         type=str, default='recording')
     parser.add_argument('-c', "--cmap", help="colormap used in viewer", 
                         default='ironbow', 
@@ -505,8 +505,6 @@ class Lepton():
                 T_img = T_img.tobytes()
                 fs[0].write(T_img)
                 fs[0].write(b'\0')
-                # temperature_C=self.temperature_C_buffer[0].tobytes()
-                # fs[0].write(temperature_C)
                 
                 telemetry=self.telemetry_buffer[0]
                 json.dump(telemetry, fs[1])
