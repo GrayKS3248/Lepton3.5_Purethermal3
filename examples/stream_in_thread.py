@@ -24,7 +24,7 @@ if __name__ == "__main__":
     lepton.wait_until_stream_active()
     
     # Do other things while Lepton is streaming
-    prev_frame = lepton.get_frame_number()
+    prev_frame = -1
     while lepton.is_streaming():
         frame = lepton.get_frame_number()
         if frame > prev_frame:
