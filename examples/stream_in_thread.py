@@ -3,12 +3,13 @@ sys.path.append("..")
 from lepton import Lepton
 sys.path.pop(-1)
 import threading
+import time
 
 PORT = 0
 CMAP = 'ironbow'
 RECORD = False
 FPS = None
-DETECT = False
+DETECT = True
 MULTIFRAME = True
 EQUALIZE = False
 
@@ -23,14 +24,13 @@ if __name__ == "__main__":
     lepton.wait_until_stream_active()
     
     # Do other things while Lepton is streaming
-    is_streaming = lepton.is_streaming()
     prev_frame = lepton.get_frame_number()
-    while is_streaming:
+    while lepton.is_streaming():
         frame = lepton.get_frame_number()
         if frame > prev_frame:
             print("Frame {} @ {:.3f}s".format(frame, lepton.get_time()))
         prev_frame = frame
-        is_streaming = lepton.is_streaming()
+        time.sleep(0.01) # Remove some CPU stress
         
     # Join the Lepton thread
     thread1.join()
