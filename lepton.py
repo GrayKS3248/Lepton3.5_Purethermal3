@@ -291,6 +291,7 @@ class Lepton():
         self.image_buffer = deque()
         self.mask_buffer = deque()
         
+        self.frame_number = 0
         self.flag_streaming = False
         self.flag_recording = False
         self.flag_emergency_stop = False
@@ -329,7 +330,7 @@ class Lepton():
             else:
                 mask = self.detector.front(self.temperature_C_buffer,
                                            method='kmeans')
-            self.mask_buffer.append(None)
+            self.mask_buffer.append(mask)
             self.image_buffer[-1][mask] = [0,255,0]
     
     def _uptime_str(self):
@@ -440,6 +441,7 @@ class Lepton():
                 self._temperature_2_image(equalize)
                 self._detect_front(detect_fronts, multiframe)
                 self._show()
+                self.frame_number += 1
                 self.flag_streaming = not self._esc_pressed()
                 
                 if self.AUTO_FLUSH_BUFFER:
@@ -453,11 +455,6 @@ class Lepton():
                         self.mask_buffer.popleft()
         
         cv2.destroyAllWindows()
-
-    def stream(self, fps=None, detect_fronts=False, multiframe=True, 
-               equalize=False):
-        return _safe_run(self._stream, self._stop_stream,
-                         args=(fps, detect_fronts, multiframe, equalize, ))
     
     def _wait_until(self, condition, timeout_ms=5000.0, dt_ms=10.0):
         epoch_s = time.time()
@@ -536,20 +533,53 @@ class Lepton():
     
     def _record(self, fps, detect_fronts, multiframe, equalize):
         os.makedirs('temp', exist_ok=True)
-        thread1=threading.Thread(target=self.stream, 
+        thread1=threading.Thread(target=self.start_stream, 
                                  args=(fps, detect_fronts, 
                                        multiframe, equalize))
         thread2=threading.Thread(target=self._write_frames)
         thread1.start()
-        self._wait_until(self._ready_to_record)
+        self.wait_until_stream_active()
         thread2.start()
         thread1.join()
         thread2.join()
+    
+    def is_streaming(self):
+        return self.flag_streaming
         
-    def record(self, fps=None, detect_fronts=False, multiframe=True, 
-               equalize=False):
+    def start_stream(self, fps=None, detect_fronts=False, multiframe=True, 
+                     equalize=False):
+        return _safe_run(self._stream, self._stop_stream,
+                         args=(fps, detect_fronts, multiframe, equalize, ))    
+
+    def wait_until_stream_active(self):
+        return _safe_run(self._wait_until, args=(self._ready_to_record,))    
+
+    def is_recording(self):
+        return self.flag_recording
+
+    def start_record(self, fps=None, detect_fronts=False, multiframe=True, 
+                     equalize=False):
         return _safe_run(self._record, self._stop_record, 
                          args=(fps, detect_fronts, multiframe, equalize))
+    
+    def get_temperature(self):
+        if len(self.temperature_C_buffer) > 0:
+            return self.temperature_C_buffer[-1]
+        return None
+    
+    def get_front_mask(self):
+        if len(self.mask_buffer) > 0:
+            return self.mask_buffer[-1]
+        return None
+    
+    def get_time(self):
+        if len(self.telemetry_buffer) > 0:
+            t = self.telemetry_buffer[-1]['Uptime (ms)']*0.001
+            return round(t, 3)
+        return None
+    
+    def get_frame_number(self):
+        return self.frame_number
     
 
 class Videowriter():
@@ -651,14 +681,14 @@ if __name__ == "__main__":
     lepton = Lepton(args.port, args.cmap, args.record)
     if not args.record:
         print("Streaming...")
-        lepton.stream(fps=args.fps, detect_fronts=args.detect, 
-                      multiframe=args.multiframe, equalize=args.equalize)
+        lepton.start_stream(fps=args.fps, detect_fronts=args.detect, 
+                         multiframe=args.multiframe, equalize=args.equalize)
         print("Stream done.")
         
     else:
         print("Recording...")
-        lepton.record(fps=args.fps, detect_fronts=args.detect,
-                      multiframe=args.multiframe, equalize=args.equalize)
+        lepton.start_record(fps=args.fps, detect_fronts=args.detect,
+                            multiframe=args.multiframe, equalize=args.equalize)
         print('Record done.')
         writer = Videowriter()
         print('Writing video...')
