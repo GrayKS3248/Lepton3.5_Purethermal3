@@ -14,13 +14,11 @@ This work is licensed under a [Creative Commons Attribution-ShareAlike 4.0 Inter
 
 Software to run a FLIR Lepton 3.5 mounted on a Groupgets Purethermal3 board running on Windows 10.
 
----
-
 # Installation
 
 You must first install a set of dependencies. It is reccomended that you use either [Anaconda or Miniconda](https://www.anaconda.com/download/success).
 
-## Conda from .yml (RECOMMENDED)
+#### Conda from .yml (RECOMMENDED)
 
 Open a Conda prompt.
 
@@ -30,7 +28,7 @@ Run the command below to create a Conda environment named Lepton and automatical
 conda env create -f environment.yml -p PATH_TO_INSTALL
 ```
 
-## Conda from Source
+#### Conda from Source
 
 Open a Conda prompt.
 
@@ -55,11 +53,9 @@ conda install pip git numpy matplotlib -y
 pip install opencv-python pyav
 ```
 
- ---
-
 # Usage
 
-## Stream
+#### Streaming
 
 After the Lepton is seated in the Purethermal board and connected to a device via a USB-C, open a Conda prompt.
 
@@ -72,7 +68,7 @@ python lepton.py
 
 When you are finshed streaming, press the `esc` while the viewing window is active to terminate the streaming.
 
-## Record
+#### Recording
 
 After the Lepton is seated in the Purethermal board and connected to a device via a USB-C, open a Conda prompt.
 
@@ -85,9 +81,9 @@ python lepton.py -r
 
 the `-r` flag indicates that you want to record what is being streamed. All generated data is saved in a temporary folder named temp and after the recording is terminated, will be rendered into a `.avi` video.
 
-When you are finshed recording, press the `esc` while the viewing window is active to terminate the recording.
+When you are finshed recording, press the `esc` while the viewing window is active to terminate recording. Note that it will take some time after the recording is terminated to render the captured video.
 
-## Other
+#### Other
 
 You can use the `-h` flag to explore addtional flags and functionality.
 
@@ -118,9 +114,9 @@ options:
   -f FPS                target FPS of camera
 ```
 
----
-
 # Common Errors
+
+#### Port and Socket
 
 ```shell
 Error: "Captured image shape (x, y) does not equal expected image 
@@ -143,8 +139,20 @@ Type of error: <class '__main__.ImageShapeException'>
 
 2. ___The lepton is not seated properly in the Purethermal socket.___
    
-   To fix, disconnect the Purethermal from power, completely remove the Lepton from the Purethermal socket, and reinsert it. After power is restored, try again running 
+   To fix, disconnect the Purethermal from power, completely remove the Lepton from the Purethermal socket, and reinsert it. After power is restored, try again running: 
    
    ```
    python lepton.py
    ```
+
+#### Failed Recording
+
+In some cases, a video may fail to gen generated after the recording is finished. This occurs most commonly when the recording frame rate was too low for the renderer to handle. To correct this issue:
+
+1. Avoid setting target frame rates below 5 fps.
+
+2. Avoid detecting fronts while recording.
+
+#### Lost Frames Every 3 Minutes
+
+The FLIR Lepton camera uses automatic flat field correction (FFC) during operation to ensure image fidelity and prevent pixel drift. These automatic FFCs occur every 3 minutes and are predicated by a box reading "FFC" in the top left corner of the viewing window. They last approximately 3 seconds during which no thermal data or telemetry are sent by the camera, so these frames are dropped, though the renderer automatically corrects for this to maintain true playback speed.
