@@ -9,19 +9,18 @@ from flir import cmaps as FLIR_CMAPS
 
 # Std modules
 import os
+os.system("")
 import ast
 import struct
 import zlib
 import time
 from contextlib import ExitStack
 from collections import deque
-import threading
 import json
 from fractions import Fraction
 from copy import copy
 import argparse
 import warnings
-
 
 def _safe_run(function, stop_function=None, args=(), stop_args=()):
     try: 
@@ -39,7 +38,7 @@ def _parse_args():
     parser.add_argument('-p', '--port', help="Lepton camera port", 
                         type=int, default=0)
     parser.add_argument('-r', "--record", help="record data stream", 
-                        action=argparse.BooleanOptionalAction, default=False)
+                        action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument('-n', "--name", help="name of saved video file", 
                         type=str, default='recording')
     parser.add_argument('-c', "--cmap", help="colormap used in viewer", 
@@ -51,7 +50,7 @@ def _parse_args():
                         help="apply histogram equalization to image", 
                         action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument('-d', "--detect", help="if fronts are detected", 
-                        action=argparse.BooleanOptionalAction, default=False)
+                        action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument('-m', "--multiframe", help="detection type", 
                         action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument('-f', "--fps", help="target FPS of camera", 
@@ -90,7 +89,7 @@ def _decode_tiff(tiff_bytes):
 def decode_temperature_dat(dirpath='temp', telemetry_file='telem.json',
                            temperature_file='temperature.dat'):
     data = {'Temperature (C)' : [],
-            'Time (S)' : [],}
+            'Timestamp (ms)' : [],}
     
     paths = [os.path.join(dirpath, telemetry_file),
              os.path.join(dirpath, temperature_file)]
@@ -100,7 +99,7 @@ def decode_temperature_dat(dirpath='temp', telemetry_file='telem.json',
         fs = [stack.enter_context(open(f,t)) for (f,t) in zip(paths, typ)]
         
         epoch_ms = None
-        prev_time_s = -np.inf
+        prev_time_stamp_ms = -np.inf
         while True:
             telem = _read_telem(fs[0])
             tiff = _read_tiff(fs[1])
@@ -111,15 +110,71 @@ def decode_temperature_dat(dirpath='temp', telemetry_file='telem.json',
     
             time_ms = telem['Uptime (ms)']
             if epoch_ms is None: epoch_ms = time_ms
-            time_s = 0.001*(time_ms - epoch_ms)
-            if time_s <= prev_time_s: continue    
-            prev_time_s = copy(time_s)
+            time_stamp_ms = (time_ms - epoch_ms)
+            if time_stamp_ms <= prev_time_stamp_ms: continue    
+            prev_time_stamp_ms = copy(time_stamp_ms)
 
             temperature_mK = _decode_tiff(tiff)
             if temperature_mK is None: continue
             temperature_C = 0.01*temperature_mK.astype(float)-273.15
             data['Temperature (C)'].append(temperature_C)
-            data['Time (S)'].append(time_s)
+            data['Timestamp (ms)'].append(time_stamp_ms)
+            
+    return data
+
+def _read_cmask(f):
+    data = None
+    while True:
+        bit = f.read(1)
+        if bit==b'': 
+            return data
+        if data is None: 
+            data = bit 
+            continue
+        data += bit
+        if (len(data)>3 and 
+            data[-1]==68 and
+            data[-2]==78 and
+            data[-3]==69 and
+            data[-4]==73): 
+            return data[:-4]
+
+def _decode_cmask(cmask):
+    mask = np.frombuffer(zlib.decompress(cmask), dtype=bool)
+    return mask.reshape((120,160))
+
+def decode_mask_dat(dirpath='temp', telemetry_file='telem.json',
+                    mask_file='mask.dat'):
+    data = {'Mask' : [],
+            'Timestamp (ms)' : [],}
+    
+    paths = [os.path.join(dirpath, telemetry_file),
+             os.path.join(dirpath, mask_file)]
+    typ = ['r', 'rb']
+    
+    with ExitStack() as stack:
+        fs = [stack.enter_context(open(f,t)) for (f,t) in zip(paths, typ)]
+        
+        epoch_ms = None
+        prev_time_stamp_ms = -np.inf
+        while True:
+            telem = _read_telem(fs[0])
+            cmask = _read_cmask(fs[1])
+            if telem is None or cmask is None: break
+        
+            if telem['Uptime (ms)']==0: continue
+            if telem['Video format']=='': continue
+    
+            time_ms = telem['Uptime (ms)']
+            if epoch_ms is None: epoch_ms = time_ms
+            time_stamp_s = (time_ms - epoch_ms)
+            if time_stamp_s <= prev_time_stamp_ms: continue    
+            prev_time_stamp_ms = copy(time_stamp_s)
+
+            mask = _decode_cmask(cmask)
+            if mask is None: continue
+            data['Mask'].append(mask)
+            data['Timestamp (ms)'].append(time_stamp_s)
             
     return data
 
@@ -140,6 +195,18 @@ class TimeoutException(Exception):
         
     def __str__(self):
         return str(self.message)
+
+
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
 
 
 class Capture():
@@ -277,12 +344,11 @@ class Capture():
 
 
 class Lepton():
-    def __init__(self, camera_port, cmap, record):
+    def __init__(self, camera_port, cmap):
         self.PORT = camera_port
         self.CMAP = FLIR_CMAPS[cmap]
         self.BUFFER_SIZE = 3
         self.SHOW_SCALE = 3
-        self.AUTO_FLUSH_BUFFER = not record
         
         self.detector = Detector()
         
@@ -290,8 +356,6 @@ class Lepton():
         self.telemetry_buffer = deque()
         self.image_buffer = deque()
         self.mask_buffer = deque()
-        
-        self._detect_buffer = deque()
         
         self.frame_number = 0
         self.flag_streaming = False
@@ -302,20 +366,16 @@ class Lepton():
         temperature_C, telemetry = self.cap.read()
         self.temperature_C_buffer.append(temperature_C)
         self.telemetry_buffer.append(telemetry)
-        
-        self._detect_buffer.append(temperature_C)
-        while len(self._detect_buffer) > 3:
-            self._detect_buffer.popleft()
     
     def _detect_front(self, detect_fronts, multiframe):
-        if not detect_fronts or len(self._detect_buffer)<1:
+        if not detect_fronts or len(self.temperature_C_buffer)<1:
             self.mask_buffer.append(None)
             return
         
         if multiframe:
-            mask=self.detector.front(self._detect_buffer, 'kmeans')
+            mask=self.detector.front(self.temperature_C_buffer, 'kmeans')
         else:
-            mask=self.detector.front([self._detect_buffer[-1]], 'kmeans')
+            mask=self.detector.front([self.temperature_C_buffer[-1]], 'kmeans')
         self.mask_buffer.append(mask)
     
     def _normalize_temperature(self, temperature_C, alpha=0.0, beta=1.0,
@@ -429,38 +489,112 @@ class Lepton():
             return True
         return False    
 
-    def _stop_stream(self):
+    def _estop_stream(self):
         self.flag_emergency_stop = True
         self.flag_streaming = False
         cv2.destroyAllWindows()
 
+    def _capture_frame(self, detect_fronts, multiframe, equalize):
+        self._read_cap()
+        self._detect_front(detect_fronts, multiframe)
+        self._temperature_2_image(equalize)
+        self._show()
+        self.frame_number += 1
+        self.flag_streaming = not self._esc_pressed()
+        
+    def _trim_buffers(self):
+        while len(self.temperature_C_buffer) > self.BUFFER_SIZE:
+            self.temperature_C_buffer.popleft()
+        while len(self.telemetry_buffer) > self.BUFFER_SIZE:
+            self.telemetry_buffer.popleft()
+        while len(self.image_buffer) > self.BUFFER_SIZE:
+            self.image_buffer.popleft()
+        while len(self.mask_buffer) > self.BUFFER_SIZE:
+            self.mask_buffer.popleft()
+
     def _stream(self, fps, detect_fronts, multiframe, equalize):
         with Capture(self.PORT, fps) as self.cap:
+            
             self.flag_streaming = True
             while self.flag_streaming:
+                
                 if self.flag_emergency_stop:
-                    cv2.destroyAllWindows()
-                    self.flag_streaming = False
+                    self._estop_stream()
                     return
                 
-                self._read_cap()
-                self._detect_front(detect_fronts, multiframe)
-                self._temperature_2_image(equalize)
-                self._show()
-                self.frame_number += 1
-                self.flag_streaming = not self._esc_pressed()
-                
-                if self.AUTO_FLUSH_BUFFER:
-                    while len(self.temperature_C_buffer) > self.BUFFER_SIZE:
-                        self.temperature_C_buffer.popleft()
-                    while len(self.telemetry_buffer) > self.BUFFER_SIZE:
-                        self.telemetry_buffer.popleft()
-                    while len(self.image_buffer) > self.BUFFER_SIZE:
-                        self.image_buffer.popleft()
-                    while len(self.mask_buffer) > self.BUFFER_SIZE:
-                        self.mask_buffer.popleft()
+                self._capture_frame(detect_fronts, multiframe, equalize)
+                self._trim_buffers()
+            cv2.destroyAllWindows()
         
-        cv2.destroyAllWindows()
+    def _estop_record(self):
+        self._estop_stream()
+        self.flag_emergency_stop = True
+        self.flag_recording = False
+    
+    def _min_buf_len(self):
+        return min(len(self.temperature_C_buffer), len(self.telemetry_buffer),
+                   len(self.image_buffer), len(self.mask_buffer),)
+    
+    def _write_frame(self, T_file, t_file, i_file, m_file,
+                     ignore_buf_min=False):
+        if self._min_buf_len()<=self.BUFFER_SIZE and not ignore_buf_min: 
+            return
+        
+        temperature_C = self.temperature_C_buffer[0]
+        temperature_mK = np.round(100.*(temperature_C+273.15))
+        temperature_mK = temperature_mK.astype(np.uint16)
+        encode_param = [int(cv2.IMWRITE_TIFF_COMPRESSION), 
+                        cv2.IMWRITE_TIFF_COMPRESSION_LZW]
+        T_img = cv2.imencode('.tiff', temperature_mK, encode_param)[1]
+        T_img = T_img.tobytes()
+        T_file.write(T_img)
+        T_file.write(b'\0')
+        
+        telemetry=self.telemetry_buffer[0]
+        json.dump(telemetry, t_file)
+        t_file.write('\n')
+        
+        image=cv2.imencode('.png', self.image_buffer[0])[1].tobytes()
+        i_file.write(image)
+        
+        mask=self.mask_buffer[0]
+        if not mask is None: 
+            m_file.write(zlib.compress(mask.tobytes()))
+            m_file.write(b'IEND')
+        
+        self.temperature_C_buffer.popleft()
+        self.telemetry_buffer.popleft()
+        self.image_buffer.popleft()
+        self.mask_buffer.popleft()
+    
+    def _record(self, fps, detect_fronts, multiframe, equalize):
+        dirname = 'temp'
+        os.makedirs(dirname, exist_ok=True)
+        fnames = ['temperature.dat', 'telem.json', 'image.dat', 'mask.dat']
+        typ = ['wb', 'w', 'wb', 'wb']
+        
+        with (Capture(self.PORT, fps) as self.cap,
+              open(os.path.join(dirname, fnames[0]), typ[0]) as T_file,
+              open(os.path.join(dirname, fnames[1]), typ[1]) as t_file,
+              open(os.path.join(dirname, fnames[2]), typ[2]) as i_file,
+              open(os.path.join(dirname, fnames[3]), typ[3]) as m_file,):
+            
+            self.flag_streaming = True
+            self.flag_recording = True
+            while self.flag_streaming:
+                
+                if self.flag_emergency_stop:
+                    self._estop_record()
+                    return
+                
+                self._capture_frame(detect_fronts, multiframe, equalize)
+                self._write_frame(T_file, t_file, i_file, m_file)        
+            cv2.destroyAllWindows()
+            
+            while self._min_buf_len() > 0:
+                self._write_frame(T_file, t_file, i_file, m_file,
+                                  ignore_buf_min=True)
+            self.recording=False
     
     def _wait_until(self, condition, timeout_ms=5000.0, dt_ms=10.0):
         epoch_s = time.time()
@@ -473,91 +607,27 @@ class Lepton():
                                        timeout_s)
             time.sleep(dt_s)
             if self.flag_emergency_stop: break
-    
-    def _stop_write_frames(self):
-        self.flag_emergency_stop = True
-        self.flag_recording = False
-    
-    def _write_frames_(self):
-        self.flag_recording = True
-        
-        dirname = 'temp'
-        fnames = ['temperature.dat', 'telem.json', 'image.dat', 'mask.dat']
-        paths = [os.path.join(dirname, f) for f in fnames]
-        typ = ['wb', 'w', 'wb', 'wb']
-        with ExitStack() as stack:
-            fs = [stack.enter_context(open(f,t)) for (f,t) in zip(paths, typ)]
-        
-            while self._ready_to_record():
-                if self.flag_emergency_stop:
-                    self.flag_recording = False
-                    return 
-                
-                buff_len = min(len(self.temperature_C_buffer),
-                               len(self.telemetry_buffer),
-                               len(self.image_buffer),
-                               len(self.mask_buffer),)
-                if buff_len<=self.BUFFER_SIZE and self.flag_streaming: continue
-                
-                temperature_C = self.temperature_C_buffer[0]
-                temperature_mK = np.round(100.*(temperature_C+273.15))
-                temperature_mK = temperature_mK.astype(np.uint16)
-                encode_param = [int(cv2.IMWRITE_TIFF_COMPRESSION), 
-                                cv2.IMWRITE_TIFF_COMPRESSION_LZW]
-                T_img = cv2.imencode('.tiff', temperature_mK, encode_param)[1]
-                T_img = T_img.tobytes()
-                fs[0].write(T_img)
-                fs[0].write(b'\0')
-                
-                telemetry=self.telemetry_buffer[0]
-                json.dump(telemetry, fs[1])
-                fs[1].write('\n')
-                
-                image=cv2.imencode('.png', self.image_buffer[0])[1].tobytes()
-                fs[2].write(image)
-                
-                mask=self.mask_buffer[0]
-                if not mask is None: 
-                    fs[3].write(mask.tobytes())
-                
-                # TODO: THIS CAUSES SLOW DOWN WHEN DETECT FRONT AND RECORD
-                #####
-                self.temperature_C_buffer.popleft()
-                self.telemetry_buffer.popleft()
-                self.image_buffer.popleft()
-                self.mask_buffer.popleft()
-                #####
-            
-        self.flag_recording = False
-        
-    def _write_frames(self):
-        return _safe_run(self._write_frames_, self._stop_write_frames)
 
     def _ready_to_record(self):
         return self.flag_streaming or len(self.image_buffer)>1
-        
-    def _stop_record(self):
-        self.flag_emergency_stop = True
-        self.flag_recording = False
     
-    def _record(self, fps, detect_fronts, multiframe, equalize):
-        os.makedirs('temp', exist_ok=True)
-        thread1=threading.Thread(target=self.start_stream, 
-                                 args=(fps, detect_fronts, 
-                                       multiframe, equalize))
-        thread2=threading.Thread(target=self._write_frames)
-        thread1.start()
-        self.wait_until_stream_active()
-        thread2.start()
-        thread1.join()
-        thread2.join()
+    def emergency_stop(self):
+        if not self.flag_emergency_stop:
+            self.flag_emergency_stop = True
+            string = 'EMERGENCY STOP COMMAND RECIEVED'
+            print(bcolors.WARNING+string+bcolors.ENDC)
+            print(bcolors.FAIL+'STOPPING...'+bcolors.ENDC)
+        if (self.flag_emergency_stop and 
+            not self.flag_recording and 
+            not self.flag_streaming):
+            print(bcolors.FAIL+'STOPPED'+bcolors.ENDC)            
     
     def is_streaming(self):
         return self.flag_streaming
         
     def start_stream(self, fps=None, detect_fronts=False, multiframe=True, 
                      equalize=False):
-        return _safe_run(self._stream, self._stop_stream,
+        return _safe_run(self._stream, self._estop_stream,
                          args=(fps, detect_fronts, multiframe, equalize, ))    
 
     def wait_until_stream_active(self):
@@ -568,7 +638,7 @@ class Lepton():
 
     def start_record(self, fps=None, detect_fronts=False, multiframe=True, 
                      equalize=False):
-        return _safe_run(self._record, self._stop_record, 
+        return _safe_run(self._record, self._estop_record, 
                          args=(fps, detect_fronts, multiframe, equalize))
     
     def get_temperature(self):
@@ -687,7 +757,7 @@ if __name__ == "__main__":
         wstr="Target FPS set below 5 can result in erroneous video rendering."
         warnings.warn(wstr)
 
-    lepton = Lepton(args.port, args.cmap, args.record)
+    lepton = Lepton(args.port, args.cmap)
     if not args.record:
         print("Streaming...")
         lepton.start_stream(fps=args.fps, detect_fronts=args.detect, 
