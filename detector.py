@@ -1,5 +1,6 @@
 import numpy as np
 import cv2
+from sklearn.cluster import KMeans
 
 class Detector():
     def __init__(self, T0=0.0, a0=0.0, Hr=3.50e5, Cp=1600.0):
@@ -65,7 +66,7 @@ class Detector():
         flags = cv2.KMEANS_RANDOM_CENTERS
         
         # Extract the most recent temperature 
-        t = temperatures[-1].astype(float)
+        t = temperatures[-1]
         
         # Blur the temperature image
         s0 = int(np.round(t.shape[0]/40.))
@@ -88,15 +89,15 @@ class Detector():
         _, t_lab, t_cen = cv2.kmeans(fbt, 4, None, criteria, n_try, flags)
         t_cen = t_cen.flatten()
         sort_t_cen = np.array(sorted(zip(t_cen, np.arange(0, len(t_cen)))))
-            
+        
         # Get the candidate front masked based on only temperature
         t_lab = t_lab.reshape((l,w))
         t_mask = np.logical_or(t_lab==sort_t_cen[1,1],
                                t_lab==sort_t_cen[2,1])
         
         # Get the L2 norm of the gradient of the temperature field
-        dx, dy = np.gradient(t)
-        g = np.sqrt(abs(dx)**2. + abs(dy)**2.)
+        dx, dy = np.gradient(bt)
+        g = np.sqrt(np.square(dx)+np.square(dy))
         
         # Blur the L2 norm of the gradient
         bg = cv2.GaussianBlur(g, size, 0)
@@ -113,7 +114,7 @@ class Detector():
         _, g_lab, g_cen = cv2.kmeans(fbg, 4, None, criteria, n_try, flags)
         g_cen = g_cen.flatten()
         sort_g_cen = np.array(sorted(zip(g_cen, np.arange(0, len(g_cen)))))
-            
+        
         # Get the candidate front mask based on only the gradient
         g_lab = g_lab.reshape((l,w))
         g_mask = g_lab==sort_g_cen[3,1]
@@ -128,11 +129,11 @@ class Detector():
         # Calculate the time derivative of the blurred temperature sequence
         # based on 3 step finite difference
         elif len(temperatures) == 2:
-            bt_m1 = cv2.GaussianBlur(temperatures[0].astype(float), size, 0)
+            bt_m1 = cv2.GaussianBlur(temperatures[0], size, 0)
             bdt = -1.0*bt_m1 + 1.0*bt
         elif len(temperatures) >= 3:
-            bt_m2 = cv2.GaussianBlur(temperatures[-3].astype(float), size, 0)
-            bt_m1 = cv2.GaussianBlur(temperatures[-2].astype(float), size, 0)
+            bt_m2 = cv2.GaussianBlur(temperatures[-3], size, 0)
+            bt_m1 = cv2.GaussianBlur(temperatures[-2], size, 0)
             bdt = 0.5*bt_m2 - 2.0*bt_m1 + 1.5*bt
         
         # Isolate regions that got hotter. The front won't get colder.

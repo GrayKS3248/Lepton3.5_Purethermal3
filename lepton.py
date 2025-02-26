@@ -12,7 +12,6 @@ import os
 import ast
 import struct
 import zlib
-from collections import deque
 import time
 from contextlib import ExitStack
 import threading
@@ -280,16 +279,16 @@ class Lepton():
     def __init__(self, camera_port, cmap, record):
         self.PORT = camera_port
         self.CMAP = FLIR_CMAPS[cmap]
-        self.BUFFER_SIZE = 4
+        self.BUFFER_SIZE = 3
         self.SHOW_SCALE = 3
         self.AUTO_FLUSH_BUFFER = not record
         
         self.detector = Detector()
         
-        self.temperature_C_buffer = deque()
-        self.telemetry_buffer = deque()
-        self.image_buffer = deque()
-        self.mask_buffer = deque()
+        self.temperature_C_buffer = []
+        self.telemetry_buffer = []
+        self.image_buffer = []
+        self.mask_buffer = []
         
         self.frame_number = 0
         self.flag_streaming = False
@@ -300,6 +299,17 @@ class Lepton():
         temperature_C, telemetry = self.cap.read()
         self.temperature_C_buffer.append(temperature_C)
         self.telemetry_buffer.append(telemetry)
+    
+    def _detect_front(self, detect_fronts, multiframe):
+        if not detect_fronts or len(self.temperature_C_buffer)<1:
+            self.mask_buffer.append(None)
+            return
+        
+        if multiframe:
+            mask=self.detector.front(self.temperature_C_buffer, 'kmeans')
+        else:
+            mask=self.detector.front([self.temperature_C_buffer[-1]], 'kmeans')
+        self.mask_buffer.append(mask)
     
     def _normalize_temperature(self, temperature_C, alpha=0.0, beta=1.0,
                                equalize=True):
@@ -319,19 +329,6 @@ class Lepton():
         image = self.CMAP(image)
         image = np.round(255.0*image[:,:,:-1]).astype(np.uint8)
         self.image_buffer.append(image)
-    
-    def _detect_front(self, detect_fronts, multiframe):
-        if len(self.temperature_C_buffer)<=0 or not detect_fronts:
-            self.mask_buffer.append(None)
-        else:
-            if not multiframe:
-                mask = self.detector.front([self.temperature_C_buffer[-1]],
-                                           method='kmeans')
-            else:
-                mask = self.detector.front(self.temperature_C_buffer,
-                                           method='kmeans')
-            self.mask_buffer.append(mask)
-            self.image_buffer[-1][mask] = [0,255,0]
     
     def _uptime_str(self):
         telemetry = self.telemetry_buffer[-1]
@@ -401,11 +398,13 @@ class Lepton():
             telimg = cv2.putText(telimg, "FFC", (6,21),
                                 cv2.FONT_HERSHEY_PLAIN , 1, (255,255,255), 1,
                                 cv2.LINE_AA)
-        
         return telimg
     
     def _show(self):
         image = self.image_buffer[-1]
+        mask = self.mask_buffer[-1]
+        if not mask is None:
+            image[mask] = [0,255,0]
         shp = (image.shape[1]*self.SHOW_SCALE, image.shape[0]*self.SHOW_SCALE)
         scaled_image = cv2.resize(image, shp, interpolation=cv2.INTER_LINEAR)
         telem_img = self._telemetrize_image(scaled_image)
@@ -438,21 +437,21 @@ class Lepton():
                     return
                 
                 self._read_cap()
-                self._temperature_2_image(equalize)
                 self._detect_front(detect_fronts, multiframe)
+                self._temperature_2_image(equalize)
                 self._show()
                 self.frame_number += 1
                 self.flag_streaming = not self._esc_pressed()
                 
                 if self.AUTO_FLUSH_BUFFER:
                     while len(self.temperature_C_buffer) > self.BUFFER_SIZE:
-                        self.temperature_C_buffer.popleft()
+                        self.temperature_C_buffer.pop(0)
                     while len(self.telemetry_buffer) > self.BUFFER_SIZE:
-                        self.telemetry_buffer.popleft()
+                        self.telemetry_buffer.pop(0)
                     while len(self.image_buffer) > self.BUFFER_SIZE:
-                        self.image_buffer.popleft()
+                        self.image_buffer.pop(0)
                     while len(self.mask_buffer) > self.BUFFER_SIZE:
-                        self.mask_buffer.popleft()
+                        self.mask_buffer.pop(0)
         
         cv2.destroyAllWindows()
     
@@ -514,10 +513,13 @@ class Lepton():
                 if not mask is None: 
                     fs[3].write(mask.tobytes())
                 
-                self.temperature_C_buffer.popleft()
-                self.telemetry_buffer.popleft()
-                self.image_buffer.popleft()
-                self.mask_buffer.popleft()
+                # TODO: THIS CAUSES SLOW DOWN WHEN DETECT FRONT AND RECORD
+                #####
+                self.temperature_C_buffer.pop(0)
+                self.telemetry_buffer.pop(0)
+                self.image_buffer.pop(0)
+                self.mask_buffer.pop(0)
+                #####
             
         self.flag_recording = False
         
