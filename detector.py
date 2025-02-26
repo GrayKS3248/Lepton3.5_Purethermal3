@@ -1,6 +1,5 @@
 import numpy as np
 import cv2
-from sklearn.cluster import KMeans
 
 class Detector():
     def __init__(self, T0=0.0, a0=0.0, Hr=3.50e5, Cp=1600.0):
