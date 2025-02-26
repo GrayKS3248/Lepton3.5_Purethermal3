@@ -5,7 +5,7 @@ import av
 
 # Package modules
 from detector import Detector
-from flir import cmaps as FLIR_CMAPS
+from cmaps import Cmaps 
 
 # Std modules
 import os
@@ -43,9 +43,10 @@ def _parse_args():
                         type=str, default='recording')
     parser.add_argument('-c', "--cmap", help="colormap used in viewer", 
                         default='ironbow', 
-                        choices=['arctic', 'black_hot', 'ironbow',
+                        choices=['afmhot', 'arctic', 'black_hot', 'cividis', 
+                                 'ironbow', 'inferno', 'magma',
                                  'outdoor_alert', 'rainbow', 'rainbow_hc',
-                                 'white_hot'])
+                                 'viridis', 'white_hot'])
     parser.add_argument('-eq', "--equalize", 
                         help="apply histogram equalization to image", 
                         action=argparse.BooleanOptionalAction, default=False)
@@ -346,7 +347,7 @@ class Capture():
 class Lepton():
     def __init__(self, camera_port, cmap):
         self.PORT = camera_port
-        self.CMAP = FLIR_CMAPS[cmap]
+        self.CMAP = Cmaps[cmap]
         self.BUFFER_SIZE = 3
         self.SHOW_SCALE = 3
         

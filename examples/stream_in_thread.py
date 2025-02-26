@@ -1,6 +1,7 @@
 import sys
 sys.path.append("..")
 from lepton import Lepton
+from lepton import Videowriter
 from lepton import decode_temperature_dat
 from lepton import decode_mask_dat
 sys.path.pop(-1)
@@ -43,6 +44,8 @@ if __name__ == "__main__":
     
     # Decode the recorded data
     if RECORD:
+        writer = Videowriter()
+        writer.make_video()
+        
         temperature = decode_temperature_dat()
         mask = decode_mask_dat()
-        
