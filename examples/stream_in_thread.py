@@ -27,7 +27,8 @@ if __name__ == "__main__":
     else:
         thread1=threading.Thread(target=lepton.start_stream, args=args)
     thread1.start()
-    lepton.wait_until_stream_active()
+    if lepton.wait_until_stream_active(timeout_ms=5000.0) < 0:
+        lepton.emergency_stop()
     
     # Do other things while Lepton is streaming
     prev_frame = -1

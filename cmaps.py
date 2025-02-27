@@ -19,8 +19,8 @@ class Subscriptable:
 
     @classmethod
     def _get_child_dict(cls):
-        return {k.lower(): v for k, v in cls.__dict__.items()
-                if not k.startswith('_')}
+        return {key.lower(): value for key, value in cls.__dict__.items()
+                if not key.startswith('_')}
 
 @dataclass
 class Cmaps(Subscriptable):

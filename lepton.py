@@ -20,7 +20,8 @@ import json
 from fractions import Fraction
 from copy import copy
 import argparse
-import warnings
+import traceback
+import textwrap
 
 def _safe_run(function, stop_function=None, args=(), stop_args=()):
     try: 
@@ -28,9 +29,18 @@ def _safe_run(function, stop_function=None, args=(), stop_args=()):
         return 0
     except BaseException as e:
         if not stop_function is None: stop_function(*stop_args)
-        end_str = ("Error: \"{}\" while in function {}(), "
-                   "Type of error: {}")
-        print(end_str.format(e, function.__name__, type(e)))
+        msg = '\n'.join(textwrap.wrap(str(e), 80))
+        bars = ''.join(['-']*80)
+        s = ("{}{}{}\n".format(Clr.FAIL,bars,Clr.ENDC),
+             "{}{}{}\n".format(Clr.FAIL,type(e).__name__,Clr.ENDC),
+             "In function: ",
+             "{}{}(){}\n".format(Clr.OKBLUE, function.__name__, Clr.ENDC),
+             "{}{}{}\n".format(Clr.WARNING,  msg, Clr.ENDC),
+             "{}{}{}".format(Clr.FAIL,bars,Clr.ENDC),)
+        
+        print("{}{}{}".format(Clr.FAIL, bars, Clr.ENDC))
+        traceback.print_exc()
+        print(''.join(s))
         return -1
 
 def _parse_args():
@@ -47,6 +57,9 @@ def _parse_args():
                                  'ironbow', 'inferno', 'magma',
                                  'outdoor_alert', 'rainbow', 'rainbow_hc',
                                  'viridis', 'white_hot'])
+    parser.add_argument('-sf', "--scale-factor", 
+                        help="the amount the captured image is scaled by",
+                        type=int, default=3)
     parser.add_argument('-eq', "--equalize", 
                         help="apply histogram equalization to image", 
                         action=argparse.BooleanOptionalAction, default=False)
@@ -198,7 +211,7 @@ class TimeoutException(Exception):
         return str(self.message)
 
 
-class bcolors:
+class Clr:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
     OKCYAN = '\033[96m'
@@ -294,7 +307,7 @@ class Capture():
         mn_temp_C = round(np.min(temperature_C), 2)
         me_temp_C = round(np.mean(temperature_C), 2)
         mx_temp_C = round(np.max(temperature_C), 2)
-        
+
         telemetry = {'Telemetry version' : telem_revision,
                      'Uptime (ms)' : uptime_ms,
                      'FFC desired' : FFC_desired,
@@ -345,11 +358,11 @@ class Capture():
 
 
 class Lepton():
-    def __init__(self, camera_port, cmap):
+    def __init__(self, camera_port, cmap, scale_factor):
         self.PORT = camera_port
         self.CMAP = Cmaps[cmap]
+        self.SHOW_SCALE = scale_factor
         self.BUFFER_SIZE = 3
-        self.SHOW_SCALE = 3
         
         self.detector = Detector()
         
@@ -491,9 +504,11 @@ class Lepton():
         return False    
 
     def _estop_stream(self):
+        print(Clr.WARNING+"Emergency stopping stream... "+Clr.ENDC, end="")
         self.flag_emergency_stop = True
         self.flag_streaming = False
         cv2.destroyAllWindows()
+        print(Clr.FAIL+"Stopped."+Clr.ENDC)
 
     def _capture_frame(self, detect_fronts, multiframe, equalize):
         self._read_cap()
@@ -516,6 +531,10 @@ class Lepton():
     def _stream(self, fps, detect_fronts, multiframe, equalize):
         with Capture(self.PORT, fps) as self.cap:
             
+            if self.flag_emergency_stop:
+                self._estop_stream()
+                return
+            
             self.flag_streaming = True
             while self.flag_streaming:
                 
@@ -529,8 +548,10 @@ class Lepton():
         
     def _estop_record(self):
         self._estop_stream()
+        print(Clr.WARNING+"Emergency stopping record... "+Clr.ENDC, end="")
         self.flag_emergency_stop = True
         self.flag_recording = False
+        print(Clr.FAIL+"Stopped."+Clr.ENDC)
     
     def _min_buf_len(self):
         return min(len(self.temperature_C_buffer), len(self.telemetry_buffer),
@@ -580,6 +601,10 @@ class Lepton():
               open(os.path.join(dirname, fnames[2]), typ[2]) as i_file,
               open(os.path.join(dirname, fnames[3]), typ[3]) as m_file,):
             
+            if self.flag_emergency_stop:
+                self._estop_record()
+                return
+            
             self.flag_streaming = True
             self.flag_recording = True
             while self.flag_streaming:
@@ -597,14 +622,15 @@ class Lepton():
                                   ignore_buf_min=True)
             self.recording=False
     
-    def _wait_until(self, condition, timeout_ms=5000.0, dt_ms=10.0):
+    def _wait_until(self, condition, timeout_ms, dt_ms):
         epoch_s = time.time()
         timeout_s = 0.001*timeout_ms
         dt_s = 0.001*dt_ms
         while not condition():
             if (time.time()-epoch_s) > timeout_s:
-                string = "function _wait_until({}) timed out"
-                raise TimeoutException(string.format(condition.__name__), 
+                string = "Function _wait_until({}) timed out at {} ms."
+                raise TimeoutException(string.format(condition.__name__, 
+                                                     timeout_ms), 
                                        timeout_s)
             time.sleep(dt_s)
             if self.flag_emergency_stop: break
@@ -615,13 +641,8 @@ class Lepton():
     def emergency_stop(self):
         if not self.flag_emergency_stop:
             self.flag_emergency_stop = True
-            string = 'EMERGENCY STOP COMMAND RECIEVED'
-            print(bcolors.WARNING+string+bcolors.ENDC)
-            print(bcolors.FAIL+'STOPPING...'+bcolors.ENDC)
-        if (self.flag_emergency_stop and 
-            not self.flag_recording and 
-            not self.flag_streaming):
-            print(bcolors.FAIL+'STOPPED'+bcolors.ENDC)            
+            st="WARNING: Emergency stop command received. "
+            print(Clr.FAIL+st+Clr.ENDC)        
     
     def is_streaming(self):
         return self.flag_streaming
@@ -631,8 +652,9 @@ class Lepton():
         return _safe_run(self._stream, self._estop_stream,
                          args=(fps, detect_fronts, multiframe, equalize, ))    
 
-    def wait_until_stream_active(self):
-        return _safe_run(self._wait_until, args=(self._ready_to_record,))    
+    def wait_until_stream_active(self, timeout_ms=5000.0, dt_ms=10.0):
+        return _safe_run(self._wait_until, args=(self._ready_to_record,
+                                                 timeout_ms, dt_ms))    
 
     def is_recording(self):
         return self.flag_recording
@@ -756,21 +778,23 @@ if __name__ == "__main__":
     
     if not args.fps is None and args.fps < 5:
         wstr="Target FPS set below 5 can result in erroneous video rendering."
-        warnings.warn(wstr)
+        print(Clr.WARNING+'WARNING: '+wstr+Clr.ENDC)
 
-    lepton = Lepton(args.port, args.cmap)
+    lepton = Lepton(args.port, args.cmap, args.scale_factor)
     if not args.record:
         print("Streaming...")
-        lepton.start_stream(fps=args.fps, detect_fronts=args.detect, 
-                         multiframe=args.multiframe, equalize=args.equalize)
-        print("Stream done.")
+        res = lepton.start_stream(fps=args.fps, detect_fronts=args.detect, 
+                            multiframe=args.multiframe, equalize=args.equalize)
+        if res >= 0: 
+            print("Stream done.")
         
     else:
         print("Recording...")
-        lepton.start_record(fps=args.fps, detect_fronts=args.detect,
+        res = lepton.start_record(fps=args.fps, detect_fronts=args.detect,
                             multiframe=args.multiframe, equalize=args.equalize)
-        print('Record done.')
-        writer = Videowriter()
-        print('Writing video...')
-        writer.make_video(rec_name=args.name)
-        print('Writing done.')
+        if res >= 0:
+            print('Record done.')
+            writer = Videowriter()
+            print('Writing video...')
+            writer.make_video(rec_name=args.name)
+            print('Writing done.')
