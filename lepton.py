@@ -63,7 +63,7 @@ def _parse_args():
     parser.add_argument('-eq', "--equalize", 
                         help="apply histogram equalization to image", 
                         action=argparse.BooleanOptionalAction, default=False)
-    parser.add_argument('-d', "--detect", help="if fronts are detected", 
+    parser.add_argument('-d', "--detect", help="if moving fronts are detected", 
                         action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument('-m', "--multiframe", help="detection type", 
                         action=argparse.BooleanOptionalAction, default=True)
