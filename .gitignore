@@ -1,5 +1,6 @@
 cache/*
 __pycache__/*
+temp/*
 
 # Pickle
 *.p
@@ -9,7 +10,6 @@ __pycache__/*
 *.zstd
 *.json
 *.dat
-
 
 # Video
 *.mp4
