@@ -1,8 +1,11 @@
-from dataclasses import dataclass
-from typing import ClassVar
+# External modules
 import numpy as np
 from matplotlib.colors import ListedColormap
 from matplotlib import colormaps
+
+# Std modules
+from dataclasses import dataclass
+from typing import ClassVar
 
 def get_cmap(fmap, name):
     vals = np.zeros((len(fmap), 4))

@@ -89,45 +89,22 @@ You can use the `-h` flag to explore addtional flags and functionality.
 
 ```
 python lepton.py -h
-
-usage: lepton.py [-h] 
-                 [-p PORT] 
-                 [-r | --record | --no-record] 
-                 [-n NAME] 
-                 [-c {arctic,black_hot,ironbow,outdoor_alert,
-                 rainbow,rainbow_hc,white_hot}] 
-                 [-eq | --equalize | --no-equalize] 
-                 [-d | --detect | --no-detect]
-                 [-m | --multiframe | --no-multiframe] 
-                 [-f FPS]
-
-options:
-  -h, --help            show this help message and exit
-  -p PORT               Lepton camera port
-  -r, --no-record       record data stream
-  -n NAME               name of saved video file
-  -c {arctic,black_hot,ironbow,outdoor_alert,rainbow,rainbow_hc,white_hot}
-                        colormap used in viewer
-  -eq, --no-equalize    apply histogram equalization to image
-  -d, --no-detect       if fronts are detected
-  -m, --no-multiframe   detection type
-  -f FPS                target FPS of camera
 ```
 
 # Common Errors
 
 ### Port and Socket
 
-```shell
-Error: "Captured image shape (x, y) does not equal expected image 
-shape (160, 120). Are you sure the selected port is correct? 
-NOTE: If captured image shape is (61, 80) the Lepton may be seated 
-incorrectly and you should reseat its socket." 
-while in function _stream(), 
-Type of error: <class '__main__.ImageShapeException'>
+```
+ImageShapeException
+In function: _stream()
+Captured image shape (358, 640) does not equal expected image shape
+(160, 120). Are you sure the selected port is correct? NOTE: If captured
+image shape is (61,80) the Lepton may be seated incorrectly and you 
+should reseat its socket.
 ```
 
-1. _The incorrect port is selected._
+1. *The incorrect port is selected.* 
    
    To fix, try instead running:
    
@@ -135,23 +112,19 @@ Type of error: <class '__main__.ImageShapeException'>
    python lepton.py -p A_PORT_NUMBER_THAT_IS_NOT_0
    ```
    
-   Where `A_PORT_NUMBER_THAT_IS_NOT_0` is any integer that is not `0`. Each camera device has its own unique port identifier. This code defaults to using port `0` but if you have multiple cameras, the Lepton might be at a higher port number. The `-p` flag allows a users to change the selected port. 
+   Where `A_PORT_NUMBER_THAT_IS_NOT_0` is any integer that is not `0`. Each camera device has its own unique port identifier. This code defaults to using port `0` but if you have multiple cameras, the Lepton might be at a higher port number. The `-p` flag allows a users to change the selected port.
 
-2. _The lepton is not seated properly in the Purethermal socket._
+2. *The lepton is not seated properly in the Purethermal socket.*
    
-   To fix, disconnect the Purethermal from power, completely remove the Lepton from the Purethermal socket, and reinsert it. After power is restored, try again running: 
+   To fix, disconnect the Purethermal from power, completely remove the Lepton from the Purethermal socket, and reinsert it. After power is restored, try again running:
    
-   ```
+   ```shell
    python lepton.py
    ```
 
 ### Failed Recording
 
-In some cases, a video may fail to gen generated after the recording is finished. This occurs most commonly when the recording frame rate was too low for the renderer to handle. To correct this issue:
-
-1. Avoid setting target frame rates below 5 fps.
-
-2. Avoid detecting fronts while recording.
+In some cases, a video may fail to gen generated after the recording is finished. This occurs most commonly when the recording frame rate was too low for the renderer to handle. To correct this issue avoid setting target frame rates below 5 fps.
 
 ### Lost Frames Every 3 Minutes
 
