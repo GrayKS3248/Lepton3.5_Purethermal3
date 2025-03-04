@@ -443,7 +443,6 @@ class Lepton():
     
     def _draw_focus_box(self, image):
         img_h, img_w = image.shape[0], image.shape[1] 
-        img_h = img_h - 30
         box_h = int(np.round(self.focus_box_size*img_h))
         box_w = int(np.round(self.focus_box_AR*box_h))
         l = int(0.5*(img_w - box_w))
