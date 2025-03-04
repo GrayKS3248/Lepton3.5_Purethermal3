@@ -2,14 +2,14 @@ import sys
 sys.path.append("..")
 from lepton import Lepton
 from lepton import Videowriter
-from lepton import decode_temperature_dat
-from lepton import decode_mask_dat
+from lepton import decode_recording_data
 sys.path.pop(-1)
 import threading
 import time
 
 PORT = 0
 CMAP = 'ironbow'
+SCALE_FACTOR = 3
 RECORD = True
 FPS = None
 DETECT = True
@@ -18,7 +18,7 @@ EQUALIZE = False
 
 if __name__ == "__main__":   
     # Initialize lepton camera
-    lepton = Lepton(PORT, CMAP)
+    lepton = Lepton(PORT, CMAP, SCALE_FACTOR)
     
     # Begin streaming in a thread
     args = (FPS, DETECT, MULTIFRAME, EQUALIZE)
@@ -47,6 +47,4 @@ if __name__ == "__main__":
     if RECORD:
         writer = Videowriter()
         writer.make_video()
-        
-        temperature = decode_temperature_dat()
-        mask = decode_mask_dat()
+        data = decode_recording_data()

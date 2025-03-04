@@ -2,6 +2,7 @@
 import cv2
 import numpy as np
 import av
+from scipy.signal import find_peaks
 
 # Package modules
 from detector import Detector
@@ -22,8 +23,6 @@ from copy import copy
 import argparse
 import traceback
 import textwrap
-
-from scipy.signal import find_peaks
 
 
 def _safe_run(function, stop_function=None, args=(), stop_args=()):
@@ -76,51 +75,31 @@ def _parse_args():
     args = parser.parse_args()
     return args
 
-def _read_telem(f):
-    data = []
-    while True:
-        char = f.read(1)
-        if len(char)==0: return None
-        data.append(char)
-        if char == "}": break
-    return ast.literal_eval(''.join(data))
+def decode_recording_data(dirpath='temp', telemetry_file='telem.json',
+                          temperature_file='temperature.dat',
+                          mask_file='mask.dat'):
+    _read_telem = Videowriter()._read_telem
+    _read_2_DELIM = Videowriter()._read_2_DELIM
+    _decode_bytes = Videowriter()._decode_bytes
     
-def _read_tiff(f):
-    data = None
-    while True:
-        bit = f.read(1)
-        if data is None: 
-            data = bit 
-            continue
-        data += bit
-        if len(data)>3 and data[-1]==42 and data[-2]==73 and data[-3]==73:
-            f.seek(-3,1)
-            return data[0:-3]
-        if bit==b'': 
-            return data
-
-def _decode_tiff(tiff_bytes):
-    nparr = np.frombuffer(tiff_bytes, np.byte)
-    return cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED)
-
-def decode_temperature_dat(dirpath='temp', telemetry_file='telem.json',
-                           temperature_file='temperature.dat'):
     data = {'Temperature (C)' : [],
+            'Mask' : [],
             'Timestamp (ms)' : [],}
     
     paths = [os.path.join(dirpath, telemetry_file),
-             os.path.join(dirpath, temperature_file)]
-    typ = ['r', 'rb']
+             os.path.join(dirpath, temperature_file),
+             os.path.join(dirpath, mask_file)]
+    typ = ['r', 'rb', 'rb']
     
     with ExitStack() as stack:
         fs = [stack.enter_context(open(f,t)) for (f,t) in zip(paths, typ)]
-        
         epoch_ms = None
         prev_time_stamp_ms = -np.inf
         while True:
             telem = _read_telem(fs[0])
-            tiff = _read_tiff(fs[1])
-            if telem is None or tiff is None: break
+            temp_bytes = _read_2_DELIM(fs[1])
+            mask_bytes = _read_2_DELIM(fs[2])
+            if telem is None or temp_bytes is None or mask_bytes is None: break
         
             if telem['Uptime (ms)']==0: continue
             if telem['Video format']=='': continue
@@ -130,68 +109,20 @@ def decode_temperature_dat(dirpath='temp', telemetry_file='telem.json',
             time_stamp_ms = (time_ms - epoch_ms)
             if time_stamp_ms <= prev_time_stamp_ms: continue    
             prev_time_stamp_ms = copy(time_stamp_ms)
-
-            temperature_mK = _decode_tiff(tiff)
-            if temperature_mK is None: continue
-            temperature_C = 0.01*temperature_mK.astype(float)-273.15
-            data['Temperature (C)'].append(temperature_C)
             data['Timestamp (ms)'].append(time_stamp_ms)
+
+            temperature_mK = _decode_bytes(temp_bytes)
+            if temperature_mK is None: 
+                data['Temperature (C)'].append(None)
+            else:
+                temperature_C = 0.01*temperature_mK.astype(float)-273.15
+                data['Temperature (C)'].append(temperature_C)
             
-    return data
-
-def _read_cmask(f):
-    data = None
-    while True:
-        bit = f.read(1)
-        if bit==b'': 
-            return data
-        if data is None: 
-            data = bit 
-            continue
-        data += bit
-        if (len(data)>3 and 
-            data[-1]==68 and
-            data[-2]==78 and
-            data[-3]==69 and
-            data[-4]==73): 
-            return data[:-4]
-
-def _decode_cmask(cmask):
-    mask = np.frombuffer(zlib.decompress(cmask), dtype=bool)
-    return mask.reshape((120,160))
-
-def decode_mask_dat(dirpath='temp', telemetry_file='telem.json',
-                    mask_file='mask.dat'):
-    data = {'Mask' : [],
-            'Timestamp (ms)' : [],}
-    
-    paths = [os.path.join(dirpath, telemetry_file),
-             os.path.join(dirpath, mask_file)]
-    typ = ['r', 'rb']
-    
-    with ExitStack() as stack:
-        fs = [stack.enter_context(open(f,t)) for (f,t) in zip(paths, typ)]
-        
-        epoch_ms = None
-        prev_time_stamp_ms = -np.inf
-        while True:
-            telem = _read_telem(fs[0])
-            cmask = _read_cmask(fs[1])
-            if telem is None or cmask is None: break
-        
-            if telem['Uptime (ms)']==0: continue
-            if telem['Video format']=='': continue
-    
-            time_ms = telem['Uptime (ms)']
-            if epoch_ms is None: epoch_ms = time_ms
-            time_stamp_s = (time_ms - epoch_ms)
-            if time_stamp_s <= prev_time_stamp_ms: continue    
-            prev_time_stamp_ms = copy(time_stamp_s)
-
-            mask = _decode_cmask(cmask)
-            if mask is None: continue
-            data['Mask'].append(mask)
-            data['Timestamp (ms)'].append(time_stamp_s)
+            mask = _decode_bytes(mask_bytes, compressed=True)
+            if mask is None: 
+                data['Mask'].append(None)
+            else: 
+                data['Mask'].append(mask)
             
     return data
 
@@ -584,7 +515,7 @@ class Lepton():
         T_img = cv2.imencode('.tiff', temperature_mK, encode_param)[1]
         T_img = T_img.tobytes()
         T_file.write(T_img)
-        T_file.write(b'\0')
+        T_file.write(b'DELIM')
         
         telemetry=self.telemetry_buffer[0]
         json.dump(telemetry, t_file)
@@ -592,11 +523,12 @@ class Lepton():
         
         image=cv2.imencode('.png', self.image_buffer[0])[1].tobytes()
         i_file.write(image)
+        i_file.write(b'DELIM')
         
         mask=self.mask_buffer[0]
         if not mask is None: 
             m_file.write(zlib.compress(mask.tobytes()))
-            m_file.write(b'IEND')
+            m_file.write(b'DELIM')
         
         self.temperature_C_buffer.popleft()
         self.telemetry_buffer.popleft()
@@ -702,30 +634,32 @@ class Videowriter():
     def __init__(self):
         pass
     
-    def _read_png_chunk(self, f):
-        preamble = f.read(8)
-        lng, typ = struct.unpack('>I4s', preamble)
-        dat = f.read(lng)
-        chksum = zlib.crc32(dat, zlib.crc32(struct.pack('>4s', typ)))
-        postamble = f.read(4)
-        crc, = struct.unpack('>I', postamble)
-        if crc != chksum:
-            raise Exception('chunk checksum failed {} != {}'.format(crc,
-                chksum))
-        return typ, preamble+dat+postamble
-    
-    def _read_png(self, f):
-        png = f.read(8)
-        if len(png) == 0: return None
+    def _read_2_DELIM(self, f):
+        data = None
         while True:
-            chunk_type, chunk = self._read_png_chunk(f)
-            png = png + chunk
-            if chunk_type == b'IEND': break
-        return png
+            bit = f.read(1)
+            if data is None: 
+                data = bit 
+                if data==b'': return None
+                else: continue
+            data += bit
+            if (len(data)>5 and 
+                data[-1]==int.from_bytes(b'M') and 
+                data[-2]==int.from_bytes(b'I') and 
+                data[-3]==int.from_bytes(b'L') and 
+                data[-4]==int.from_bytes(b'E') and 
+                data[-5]==int.from_bytes(b'D')):
+                return data[0:-5]
+            if bit==b'': 
+                return data
     
-    def _decode_png(self, png_bytes):
-        nparr = np.frombuffer(png_bytes, np.byte)
-        return cv2.imdecode(nparr, cv2.IMREAD_ANYCOLOR)
+    def _decode_bytes(self, byts, compressed=False):
+        if compressed:
+            nparr = np.frombuffer(zlib.decompress(byts), dtype=bool)
+            return nparr.reshape((120,160))
+        else:
+            nparr = np.frombuffer(byts, np.byte)
+            return cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED)
     
     def _read_telem(self, f):
         data = []
@@ -760,7 +694,7 @@ class Videowriter():
             prev_time = -np.inf
             while True:
                 telem = self._read_telem(fs[0])
-                png = self._read_png(fs[1])
+                png = self._read_2_DELIM(fs[1])
                 if telem is None or png is None: break
             
                 if telem['Uptime (ms)']==0: continue
@@ -770,7 +704,7 @@ class Videowriter():
                 time = 0.001*(time - epoch)
                 if time <= prev_time: continue
 
-                image = self._decode_png(png)
+                image = self._decode_bytes(png)
                 if not steam_is_set:
                     vid_stream.width = image.shape[1]
                     vid_stream.height = image.shape[0]
@@ -812,3 +746,4 @@ if __name__ == "__main__":
             print('Writing video...')
             writer.make_video(rec_name=args.name)
             print('Writing done.')
+            
