@@ -557,14 +557,10 @@ class Lepton():
             self.focus_box_AR = np.clip(self.focus_box_AR, 0.0, 
                                         1.333/self.focus_box_size)
 
-        if event == cv2.EVENT_LBUTTONDOWN and self.H is None:
-            in_x = self.focus_box[0][0] <= x and self.focus_box[2][0] >= x
-            in_y = self.focus_box[0][1] <= y and self.focus_box[2][1] >= y
-            in_focus_box = in_x and in_y
-            if in_focus_box:
-                self.switch_AR = not self.switch_AR
+        if event == cv2.EVENT_RBUTTONDOWN and self.H is None:
+            self.switch_AR = not self.switch_AR
                 
-        if event == cv2.EVENT_RBUTTONDOWN:
+        if event == cv2.EVENT_LBUTTONDOWN:
             if (np.nan, np.nan) in self.subject_quad:
                 insert_at = self.subject_quad.index((np.nan, np.nan))
                 self.subject_quad[insert_at] = (x,y)
