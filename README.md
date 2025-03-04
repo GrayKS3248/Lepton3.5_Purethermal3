@@ -91,6 +91,10 @@ You can use the `-h` flag to explore addtional flags and functionality.
 python lepton.py -h
 ```
 
+# Homography Transform
+
+This software supports post-processing image warping to focus on a quadrilateral region of interest. To 
+
 # Common Errors
 
 ### Port and Socket

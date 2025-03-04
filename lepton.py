@@ -822,10 +822,11 @@ class Videowriter():
         
         with av.open(valid_name, mode="w") as container:
             steam_is_set = False
-            vid_stream = container.add_stream("h264", rate=1000)
+            vid_stream = container.add_stream("h264", rate=33)
             vid_stream.pix_fmt = "yuv420p"
-            vid_stream.codec_context.time_base = Fraction(1, 1000)
-        
+            vid_stream.bit_rate = 10_000_000
+            vid_stream.codec_context.time_base = Fraction(1, 33)
+           
             epoch = None
             prev_time = -np.inf
             for telem, image in zip(telems, images):
