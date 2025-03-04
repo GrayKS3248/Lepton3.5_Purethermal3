@@ -50,9 +50,9 @@ def _parse_args():
     parser.add_argument('-p', '--port', help="Lepton camera port", 
                         type=int, default=0)
     parser.add_argument('-r', "--record", help="record data stream", 
-                        action=argparse.BooleanOptionalAction, default=True)
+                        action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument('-n', "--name", help="name of saved video file", 
-                        type=str, default='recording')
+                        type=str, default="recording")
     parser.add_argument('-c', "--cmap", help="colormap used in viewer", 
                         default='black_hot', 
                         choices=['afmhot', 'arctic', 'black_hot', 'cividis', 
@@ -705,6 +705,12 @@ class Videowriter():
             return cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED)
     
     def _get_valid_name_(self, rec_name):
+        illegal_chars = ("\\", "/", "<", ">", ":", "|", "?", "*", ".")
+        if any(illegal_char in rec_name for illegal_char in illegal_chars):
+            msg = "Could not make file name \"{}\" valid. (Illegal characters)"
+            msg = msg.format(rec_name)
+            raise InvalidNameException(msg, (rec_name, -1))
+        
         valid_name = '{}.avi'.format(rec_name)
         if not os.path.exists(valid_name): return valid_name
         
