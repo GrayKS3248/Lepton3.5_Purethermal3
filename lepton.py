@@ -15,7 +15,6 @@ import ast
 import struct
 import zlib
 import time
-from contextlib import ExitStack
 from collections import deque
 import json
 from fractions import Fraction
@@ -23,6 +22,7 @@ from copy import copy
 import argparse
 import traceback
 import textwrap
+import inspect
 
 
 def _safe_run(function, stop_function=None, args=(), stop_args=()):
@@ -50,7 +50,7 @@ def _parse_args():
     parser.add_argument('-p', '--port', help="Lepton camera port", 
                         type=int, default=0)
     parser.add_argument('-r', "--record", help="record data stream", 
-                        action=argparse.BooleanOptionalAction, default=False)
+                        action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument('-n', "--name", help="name of saved video file", 
                         type=str, default='recording')
     parser.add_argument('-c', "--cmap", help="colormap used in viewer", 
@@ -78,52 +78,24 @@ def _parse_args():
 def decode_recording_data(dirpath='temp', telemetry_file='telem.json',
                           temperature_file='temperature.dat',
                           mask_file='mask.dat'):
-    _read_telem = Videowriter()._read_telem
-    _read_2_DELIM = Videowriter()._read_2_DELIM
+    _read_DELIMed = Videowriter()._read_DELIMed
     _decode_bytes = Videowriter()._decode_bytes
     
-    data = {'Temperature (C)' : [],
-            'Mask' : [],
-            'Timestamp (ms)' : [],}
+    with open(os.path.join(dirpath, telemetry_file), 'r') as f:
+        telems = _read_DELIMed(f, 'r')
+    timestamps_ms=[ast.literal_eval(''.join(t))['Uptime (ms)'] for t in telems]
     
-    paths = [os.path.join(dirpath, telemetry_file),
-             os.path.join(dirpath, temperature_file),
-             os.path.join(dirpath, mask_file)]
-    typ = ['r', 'rb', 'rb']
+    with open(os.path.join(dirpath, temperature_file), 'rb') as f:
+        temperatures_mK = _read_DELIMed(f, 'rb')
+    temperatures_C = [0.01*_decode_bytes(t)-273.15 for t in temperatures_mK]
     
-    with ExitStack() as stack:
-        fs = [stack.enter_context(open(f,t)) for (f,t) in zip(paths, typ)]
-        epoch_ms = None
-        prev_time_stamp_ms = -np.inf
-        while True:
-            telem = _read_telem(fs[0])
-            temp_bytes = _read_2_DELIM(fs[1])
-            mask_bytes = _read_2_DELIM(fs[2])
-            if telem is None or temp_bytes is None or mask_bytes is None: break
-        
-            if telem['Uptime (ms)']==0: continue
-            if telem['Video format']=='': continue
+    with open(os.path.join(dirpath, mask_file), 'rb') as f:
+        masks = _read_DELIMed(f, 'rb')
+    masks = [_decode_bytes(m, compressed=True) for m in masks]
     
-            time_ms = telem['Uptime (ms)']
-            if epoch_ms is None: epoch_ms = time_ms
-            time_stamp_ms = (time_ms - epoch_ms)
-            if time_stamp_ms <= prev_time_stamp_ms: continue    
-            prev_time_stamp_ms = copy(time_stamp_ms)
-            data['Timestamp (ms)'].append(time_stamp_ms)
-
-            temperature_mK = _decode_bytes(temp_bytes)
-            if temperature_mK is None: 
-                data['Temperature (C)'].append(None)
-            else:
-                temperature_C = 0.01*temperature_mK.astype(float)-273.15
-                data['Temperature (C)'].append(temperature_C)
-            
-            mask = _decode_bytes(mask_bytes, compressed=True)
-            if mask is None: 
-                data['Mask'].append(None)
-            else: 
-                data['Mask'].append(mask)
-            
+    data = {'Temperature (C)' : temperatures_C,
+            'Mask' : masks,
+            'Timestamp (ms)' : timestamps_ms,}
     return data
 
 
@@ -137,6 +109,15 @@ class ImageShapeException(Exception):
 
 
 class TimeoutException(Exception):
+    def __init__(self, message, payload=None):
+        self.message = message
+        self.payload = payload
+        
+    def __str__(self):
+        return str(self.message)
+
+
+class InvalidNameException(Exception):
     def __init__(self, message, payload=None):
         self.message = message
         self.payload = payload
@@ -297,6 +278,7 @@ class Lepton():
         self.CMAP = Cmaps[cmap]
         self.SHOW_SCALE = scale_factor
         self.BUFFER_SIZE = 3
+        self.WINDOW_NAME = 'Lepton 3.5 on Purethermal 3 '
         
         self.detector = Detector()
         
@@ -309,6 +291,12 @@ class Lepton():
         self.flag_streaming = False
         self.flag_recording = False
         self.flag_emergency_stop = False
+        
+        self.flag_focus_box = False
+        self.focus_box_AR = 1.33333333
+        self.focus_box_size = 0.33333333
+        self.focus_box = ((), ())
+        self.switch_AR = True
     
     def _read_cap(self):
         temperature_C, telemetry = self.cap.read()
@@ -346,14 +334,14 @@ class Lepton():
         P[P>T] = T
         FT = np.cumsum(P)
         DT = np.floor(255*FT/FT[-1]).astype(np.uint8)
-        eq = DT[quantized]
-        return  eq / 255.0
+        eq = DT[quantized] / 255.0
+        return  eq
 
     def _temperature_2_image(self, equalize):
         image = self._normalize_temperature(self.temperature_C_buffer[-1],
                                             equalize=equalize)
-        image = self.CMAP(image)
-        image = np.round(255.0*image[:,:,:-1]).astype(np.uint8)
+        image = 255.0 * self.CMAP(image)[:,:,:-1]
+        image = np.round(image).astype(np.uint8)
         self.image_buffer.append(image)
     
     def _uptime_str(self):
@@ -426,6 +414,29 @@ class Lepton():
                                 cv2.LINE_AA)
         return telimg
     
+    def _focus_box(self, image):
+        img_h, img_w = image.shape[0], image.shape[1] 
+        img_h = img_h - 30
+        box_h = int(np.round(self.focus_box_size*img_h))
+        box_w = int(np.round(self.focus_box_AR*box_h))
+        l = int(0.5*(img_w - box_w))
+        t = int(0.5*(img_h - box_h))
+        r = l + box_w - 1
+        b = t + box_h - 1
+        self.focus_box = ((l,t),(r,b))
+        image = cv2.rectangle(image,self.focus_box[0],self.focus_box[1],
+                              [0,255,255],1)
+        
+        if self.switch_AR:
+            txt = 'AR: {:.2f}'.format(self.focus_box_AR)
+        else:
+            txt = 'Size: {:.2f}'.format(self.focus_box_size)
+        image = cv2.putText(image, txt, (l+4,t+14),
+                             cv2.FONT_HERSHEY_PLAIN , 1, (0,255,255), 1,
+                             cv2.LINE_AA)
+        
+        return image
+    
     def _show(self):
         image = self.image_buffer[-1]
         mask = self.mask_buffer[-1]
@@ -435,18 +446,18 @@ class Lepton():
         scaled_image = cv2.resize(image, shp, interpolation=cv2.INTER_LINEAR)
         telem_img = self._telemetrize_image(scaled_image)
         self.image_buffer[-1] = copy(telem_img)
+        
         if self.flag_recording:
             show_img = cv2.circle(telem_img,
                                   (telem_img.shape[1]-10,10),5,[255,0,0],-1)
-            cv2.imshow('Recording: FLIR Lepton',
-                       cv2.cvtColor(show_img,cv2.COLOR_BGR2RGB))
         else:
-            cv2.imshow('FLIR Lepton',cv2.cvtColor(telem_img,cv2.COLOR_BGR2RGB))
-
-    def _esc_pressed(self):
-        if cv2.waitKey(1) == 27:
-            return True
-        return False    
+            show_img = copy(telem_img)
+        
+        if self.flag_focus_box:
+            show_img = self._focus_box(show_img)
+            
+        show_img = cv2.cvtColor(show_img, cv2.COLOR_BGR2RGB)
+        cv2.imshow(self.WINDOW_NAME, show_img) 
 
     def _estop_stream(self):
         print(Clr.WARNING+"Emergency stopping stream... "+Clr.ENDC, end="")
@@ -455,13 +466,44 @@ class Lepton():
         cv2.destroyAllWindows()
         print(Clr.FAIL+"Stopped."+Clr.ENDC)
 
+    def _keypress_callback(self, wait=50):      
+        key = cv2.waitKeyEx(wait)
+        
+        if key == ord('f'):
+            self.flag_focus_box = not self.flag_focus_box
+    
+        if key == 27:
+            self.flag_streaming = False
+
+    def _mouse_callback(self, event, x, y, flags, param):
+        if event == cv2.EVENT_MOUSEWHEEL and self.flag_focus_box:
+            if flags > 0:
+                if self.switch_AR:
+                    self.focus_box_AR += 0.01
+                else:
+                    self.focus_box_size += 0.01
+            else:
+                if self.switch_AR:
+                    self.focus_box_AR -= 0.01
+                else:
+                    self.focus_box_size -= 0.01
+            self.focus_box_size = np.clip(self.focus_box_size, 0.0, 1.0)
+            self.focus_box_AR = np.clip(self.focus_box_AR, 0.0, 
+                                        1.333/self.focus_box_size)
+
+        if event == cv2.EVENT_LBUTTONDOWN and self.flag_focus_box:
+            in_x = self.focus_box[0][0] <= x and self.focus_box[1][0] >= x
+            in_y = self.focus_box[0][1] <= y and self.focus_box[1][1] >= y
+            in_focus_box = in_x and in_y
+            if in_focus_box:
+                self.switch_AR = not self.switch_AR
+            
+
     def _capture_frame(self, detect_fronts, multiframe, equalize):
         self._read_cap()
         self._detect_front(detect_fronts, multiframe)
         self._temperature_2_image(equalize)
-        self._show()
         self.frame_number += 1
-        self.flag_streaming = not self._esc_pressed()
         
     def _trim_buffers(self):
         while len(self.temperature_C_buffer) > self.BUFFER_SIZE:
@@ -481,6 +523,8 @@ class Lepton():
                 return
             
             self.flag_streaming = True
+            cv2.namedWindow(self.WINDOW_NAME, cv2.WINDOW_AUTOSIZE) 
+            cv2.setMouseCallback(self.WINDOW_NAME, self._mouse_callback)
             while self.flag_streaming:
                 
                 if self.flag_emergency_stop:
@@ -488,7 +532,10 @@ class Lepton():
                     return
                 
                 self._capture_frame(detect_fronts, multiframe, equalize)
+                self._show()
+                self._keypress_callback()
                 self._trim_buffers()
+                
             cv2.destroyAllWindows()
         
     def _estop_record(self):
@@ -519,7 +566,7 @@ class Lepton():
         
         telemetry=self.telemetry_buffer[0]
         json.dump(telemetry, t_file)
-        t_file.write('\n')
+        t_file.write('DELIM')
         
         image=cv2.imencode('.png', self.image_buffer[0])[1].tobytes()
         i_file.write(image)
@@ -553,6 +600,8 @@ class Lepton():
             
             self.flag_streaming = True
             self.flag_recording = True
+            cv2.namedWindow(self.WINDOW_NAME, cv2.WINDOW_AUTOSIZE) 
+            cv2.setMouseCallback(self.WINDOW_NAME, self._mouse_callback)
             while self.flag_streaming:
                 
                 if self.flag_emergency_stop:
@@ -560,13 +609,16 @@ class Lepton():
                     return
                 
                 self._capture_frame(detect_fronts, multiframe, equalize)
-                self._write_frame(T_file, t_file, i_file, m_file)        
+                self._show()
+                self._keypress_callback()
+                self._write_frame(T_file, t_file, i_file, m_file)     
+                
             cv2.destroyAllWindows()
             
             while self._min_buf_len() > 0:
                 self._write_frame(T_file, t_file, i_file, m_file,
                                   ignore_buf_min=True)
-            self.recording=False
+            self.recording=False    
     
     def _wait_until(self, condition, timeout_ms, dt_ms):
         epoch_s = time.time()
@@ -634,24 +686,15 @@ class Videowriter():
     def __init__(self):
         pass
     
-    def _read_2_DELIM(self, f):
-        data = None
-        while True:
-            bit = f.read(1)
-            if data is None: 
-                data = bit 
-                if data==b'': return None
-                else: continue
-            data += bit
-            if (len(data)>5 and 
-                data[-1]==int.from_bytes(b'M') and 
-                data[-2]==int.from_bytes(b'I') and 
-                data[-3]==int.from_bytes(b'L') and 
-                data[-4]==int.from_bytes(b'E') and 
-                data[-5]==int.from_bytes(b'D')):
-                return data[0:-5]
-            if bit==b'': 
-                return data
+    def _read_DELIMed(self, f, mode='r'):
+        data = []
+        if mode == 'r':
+            data = f.read().split('DELIM')
+        elif mode == 'rb':
+            data = f.read().split(b'DELIM')
+            
+        if len(data) > 1: return data[:-1]
+        else: return None
     
     def _decode_bytes(self, byts, compressed=False):
         if compressed:
@@ -661,50 +704,62 @@ class Videowriter():
             nparr = np.frombuffer(byts, np.byte)
             return cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED)
     
-    def _read_telem(self, f):
-        data = []
-        while True:
-            char = f.read(1)
-            if len(char)==0: return None
-            data.append(char)
-            if char == "}": break
-        return ast.literal_eval(''.join(data))
-    
-    def _make_video(self, rec_name, dirpath, telemetry_file, image_file):
-        paths = [os.path.join(dirpath, telemetry_file),
-                 os.path.join(dirpath, image_file)]
+    def _get_valid_name_(self, rec_name):
+        valid_name = '{}.avi'.format(rec_name)
+        if not os.path.exists(valid_name): return valid_name
         
-        typ = ['r', 'rb']
-        with ExitStack() as stack:
-            valid_name = '{}.avi'.format(rec_name)
-            if os.path.exists(valid_name):
-                for i in range(999):
-                    valid_name = '{}_{:03}.avi'.format(rec_name, i+1)
-                    if not os.path.exists(valid_name): break
-            
-            fs = [stack.enter_context(open(f,t)) for (f,t) in zip(paths, typ)]
-            fs.append(stack.enter_context(av.open(valid_name, mode="w")))
-            
+        max_append = 1
+        for i in range(max_append):
+            valid_name = '{}_{:03}.avi'.format(rec_name, i+1)
+            if not os.path.exists(valid_name): return valid_name
+        
+        msg = "Could not make file name \"{}\" valid.".format(rec_name)
+        raise InvalidNameException(msg, (rec_name, max_append))
+    
+    def _get_valid_name(self, rec_name):
+        try: 
+            valid_name = self._get_valid_name_(rec_name)
+            return valid_name
+        except InvalidNameException as e: 
+            msg = '\n'.join(textwrap.wrap(str(e), 80))
+            bars = ''.join(['-']*80)
+            fnc_name = inspect.currentframe().f_code.co_name
+            s = ("{}{}{}\n".format(Clr.FAIL,bars,Clr.ENDC),
+                 "{}{}{}\n".format(Clr.FAIL,type(e).__name__,Clr.ENDC),
+                 "In function: ",
+                 "{}{}(){}\n".format(Clr.OKBLUE, fnc_name, Clr.ENDC),
+                 "{}{}{}\n".format(Clr.WARNING,  msg, Clr.ENDC),)
+            print(''.join(s))
+            rec_name = input('Please enter a different name: ')
+            print("{}{}{}".format(Clr.FAIL,bars,Clr.ENDC))
+            return self._get_valid_name(rec_name)
+
+    def _make_video(self, rec_name, dirpath, telemetry_file, image_file):
+        valid_name = self._get_valid_name(rec_name)
+        
+        with open(os.path.join(dirpath, telemetry_file), 'r') as f:
+            telems = self._read_DELIMed(f, 'r')
+        telems = [ast.literal_eval(''.join(t)) for t in telems]
+        with open(os.path.join(dirpath, image_file), 'rb') as f:
+            images = self._read_DELIMed(f, 'rb')
+        images = [self._decode_bytes(i) for i in images]
+        
+        with av.open(valid_name, mode="w") as container:
             steam_is_set = False
-            vid_stream = fs[-1].add_stream("h264", rate=1000)
+            vid_stream = container.add_stream("h264", rate=1000)
             vid_stream.pix_fmt = "yuv420p"
             vid_stream.codec_context.time_base = Fraction(1, 1000)
-            
+        
             epoch = None
             prev_time = -np.inf
-            while True:
-                telem = self._read_telem(fs[0])
-                png = self._read_2_DELIM(fs[1])
-                if telem is None or png is None: break
-            
+            for telem, image in zip(telems, images):
                 if telem['Uptime (ms)']==0: continue
                 if telem['Video format']=='': continue
                 time = telem['Uptime (ms)']
                 if epoch is None: epoch = time
                 time = 0.001*(time - epoch)
                 if time <= prev_time: continue
-
-                image = self._decode_bytes(png)
+    
                 if not steam_is_set:
                     vid_stream.width = image.shape[1]
                     vid_stream.height = image.shape[0]
@@ -713,7 +768,7 @@ class Videowriter():
                 frame = av.VideoFrame.from_ndarray(image, format="rgb24")
                 frame.pts = int(round(time/vid_stream.codec_context.time_base))
                 for packet in vid_stream.encode(frame):
-                    fs[-1].mux(packet)
+                    container.mux(packet)
                 prev_time = copy(time)
 
     def make_video(self, rec_name='recording', dirpath='temp', 
