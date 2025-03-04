@@ -295,8 +295,13 @@ class Lepton():
         self.flag_focus_box = False
         self.focus_box_AR = 1.33333333
         self.focus_box_size = 0.33333333
-        self.focus_box = ((), ())
+        self.focus_box = [(), (), (), ()]
         self.switch_AR = True
+        
+        self.subject_quad = [(np.nan,np.nan), (np.nan,np.nan), 
+                             (np.nan,np.nan), (np.nan,np.nan)]
+        self.subject_next_vert = (np.nan,np.nan)
+        self.H = None
     
     def _read_cap(self):
         temperature_C, telemetry = self.cap.read()
@@ -414,7 +419,29 @@ class Lepton():
                                 cv2.LINE_AA)
         return telimg
     
-    def _focus_box(self, image):
+    def _draw_subject_quad(self, image):
+        lines = []
+        for i in range(4):
+            j = (i+1) % 4
+            lines.append([self.subject_quad[i], self.subject_quad[j]])
+        lines = np.array(lines)
+        
+        next_vert_at = np.all(np.isnan(lines[:,1,:]),axis=1)
+        if any(next_vert_at):
+            next_vert_at = np.argmax(next_vert_at)
+            lines[next_vert_at,1,:] = self.subject_next_vert
+            
+        for line in lines:
+            if np.any(np.isnan(line)): break
+            srt =  np.round(line[0]).astype(int)
+            end =  np.round(line[1]).astype(int)
+            if all(srt==end): continue
+            image = cv2.line(image, srt, end, (255,0,255), 1) 
+            
+        quad_done = not np.any(np.isnan(line))
+        return image, quad_done
+    
+    def _draw_focus_box(self, image):
         img_h, img_w = image.shape[0], image.shape[1] 
         img_h = img_h - 30
         box_h = int(np.round(self.focus_box_size*img_h))
@@ -423,28 +450,60 @@ class Lepton():
         t = int(0.5*(img_h - box_h))
         r = l + box_w - 1
         b = t + box_h - 1
-        self.focus_box = ((l,t),(r,b))
-        image = cv2.rectangle(image,self.focus_box[0],self.focus_box[1],
+        self.focus_box = [(l,t),(l,b),(r,b),(r,t)]
+        image = cv2.rectangle(image,self.focus_box[0],self.focus_box[2],
                               [0,255,255],1)
         
+        cnr=[i for i,s in enumerate(self.subject_quad) if s!=(np.nan, np.nan)]
+        cnr = len(cnr)
+        if cnr < 4:
+            image = cv2.circle(image, self.focus_box[cnr], 3, [255,0,255], -1)
+            
         if self.switch_AR:
             txt = 'AR: {:.2f}'.format(self.focus_box_AR)
+            image = cv2.rectangle(image,(l+2,t+2),(l+75,t+15),[0,0,0],-1)
         else:
             txt = 'Size: {:.2f}'.format(self.focus_box_size)
+            image = cv2.rectangle(image,(l+2,t+2),(l+89,t+15),[0,0,0],-1)
         image = cv2.putText(image, txt, (l+4,t+14),
-                             cv2.FONT_HERSHEY_PLAIN , 1, (0,255,255), 1,
+                             cv2.FONT_HERSHEY_PLAIN , 1, (255,255,255), 1,
                              cv2.LINE_AA)
         
         return image
     
+    def _focus_box(self, image):
+        image, quad_done = self._draw_subject_quad(image)
+        
+        if not quad_done: 
+            image = self._draw_focus_box(image)
+            self.H = None
+            return image
+            
+        if self.H is None:
+            xs = np.array(self.subject_quad)
+            ys = np.array(self.focus_box)
+            self.H, _ = cv2.findHomography(xs, ys)
+            
+        image = cv2.warpPerspective(image, self.H, (image.shape[1],
+                                                    image.shape[0]))
+        return image
+        
     def _show(self):
         image = self.image_buffer[-1]
         mask = self.mask_buffer[-1]
+        
         if not mask is None:
             image[mask] = [0,255,0]
+            
         shp = (image.shape[1]*self.SHOW_SCALE, image.shape[0]*self.SHOW_SCALE)
         scaled_image = cv2.resize(image, shp, interpolation=cv2.INTER_LINEAR)
-        telem_img = self._telemetrize_image(scaled_image)
+        
+        if self.flag_focus_box:
+            focused_image = self._focus_box(scaled_image)
+        else:
+            focused_image = copy(scaled_image)
+        
+        telem_img = self._telemetrize_image(focused_image)
         self.image_buffer[-1] = copy(telem_img)
         
         if self.flag_recording:
@@ -452,10 +511,7 @@ class Lepton():
                                   (telem_img.shape[1]-10,10),5,[255,0,0],-1)
         else:
             show_img = copy(telem_img)
-        
-        if self.flag_focus_box:
-            show_img = self._focus_box(show_img)
-            
+
         show_img = cv2.cvtColor(show_img, cv2.COLOR_BGR2RGB)
         cv2.imshow(self.WINDOW_NAME, show_img) 
 
@@ -468,15 +524,23 @@ class Lepton():
 
     def _keypress_callback(self, wait=50):      
         key = cv2.waitKeyEx(wait)
-        
+
         if key == ord('f'):
             self.flag_focus_box = not self.flag_focus_box
+    
+        if key == ord('r'):
+            self.subject_quad = [(np.nan,np.nan), (np.nan,np.nan), 
+                                 (np.nan,np.nan), (np.nan,np.nan)]
+            self.subject_next_vert = (np.nan,np.nan)
+            self.H = None
     
         if key == 27:
             self.flag_streaming = False
 
     def _mouse_callback(self, event, x, y, flags, param):
-        if event == cv2.EVENT_MOUSEWHEEL and self.flag_focus_box:
+        if not self.flag_focus_box: return
+        
+        if event == cv2.EVENT_MOUSEWHEEL and self.H is None:
             if flags > 0:
                 if self.switch_AR:
                     self.focus_box_AR += 0.01
@@ -491,12 +555,20 @@ class Lepton():
             self.focus_box_AR = np.clip(self.focus_box_AR, 0.0, 
                                         1.333/self.focus_box_size)
 
-        if event == cv2.EVENT_LBUTTONDOWN and self.flag_focus_box:
-            in_x = self.focus_box[0][0] <= x and self.focus_box[1][0] >= x
-            in_y = self.focus_box[0][1] <= y and self.focus_box[1][1] >= y
+        if event == cv2.EVENT_LBUTTONDOWN and self.H is None:
+            in_x = self.focus_box[0][0] <= x and self.focus_box[2][0] >= x
+            in_y = self.focus_box[0][1] <= y and self.focus_box[2][1] >= y
             in_focus_box = in_x and in_y
             if in_focus_box:
                 self.switch_AR = not self.switch_AR
+                
+        if event == cv2.EVENT_RBUTTONDOWN:
+            if (np.nan, np.nan) in self.subject_quad:
+                insert_at = self.subject_quad.index((np.nan, np.nan))
+                self.subject_quad[insert_at] = (x,y)
+            
+        if event == cv2.EVENT_MOUSEMOVE:
+            self.subject_next_vert = np.array([x,y])
             
 
     def _capture_frame(self, detect_fronts, multiframe, equalize):
