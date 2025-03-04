@@ -49,7 +49,7 @@ conda config --env --set channel_priority strict
 Finally, these commands install all external dependencies to your conda environment
 
 ```shell
-conda install pip git numpy matplotlib -y
+conda install pip git numpy matplotlib scipy -y
 pip install opencv-python pyav
 ```
 

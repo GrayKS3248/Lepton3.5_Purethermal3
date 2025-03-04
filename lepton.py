@@ -23,6 +23,9 @@ import argparse
 import traceback
 import textwrap
 
+from scipy.signal import find_peaks
+
+
 def _safe_run(function, stop_function=None, args=(), stop_args=()):
     try: 
         function(*args)
@@ -52,7 +55,7 @@ def _parse_args():
     parser.add_argument('-n', "--name", help="name of saved video file", 
                         type=str, default='recording')
     parser.add_argument('-c', "--cmap", help="colormap used in viewer", 
-                        default='ironbow', 
+                        default='black_hot', 
                         choices=['afmhot', 'arctic', 'black_hot', 'cividis', 
                                  'ironbow', 'inferno', 'magma',
                                  'outdoor_alert', 'rainbow', 'rainbow_hc',
@@ -62,7 +65,7 @@ def _parse_args():
                         type=int, default=3)
     parser.add_argument('-eq', "--equalize", 
                         help="apply histogram equalization to image", 
-                        action=argparse.BooleanOptionalAction, default=False)
+                        action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument('-d', "--detect", help="if moving fronts are detected", 
                         action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument('-m', "--multiframe", help="detection type", 
@@ -304,9 +307,9 @@ class Capture():
         if video_format == 3: video_format = 'RGB888'
         elif video_format == 7: video_format = 'RAW14'
         else: video_format = ''
-        mn_temp_C = round(np.min(temperature_C), 2)
-        me_temp_C = round(np.mean(temperature_C), 2)
-        mx_temp_C = round(np.max(temperature_C), 2)
+        mn_temp_C = float(round(np.min(temperature_C), 2))
+        me_temp_C = float(round(np.mean(temperature_C), 2))
+        mx_temp_C = float(round(np.max(temperature_C), 2))
 
         telemetry = {'Telemetry version' : telem_revision,
                      'Uptime (ms)' : uptime_ms,
@@ -396,13 +399,24 @@ class Lepton():
                                equalize=True):
         mn = np.min(temperature_C)
         mx = np.max(temperature_C)
-        rn = mx-mn
-        if rn==0.0: return temperature_C
-        
+        rn = mx - mn
+        if rn==0.0: return np.zeros(temperature_C.shape)
         norm = (temperature_C-mn) * ((beta-alpha)/(mx-mn)) + alpha
         if not equalize: return norm
-        eq = cv2.equalizeHist(np.round(norm*255).astype(np.uint8))
-        return eq.astype(float) / 255.0
+        
+        quantized = np.round(norm*255).astype(np.uint8)
+        hist = cv2.calcHist([quantized.flatten()],[0],None,[256],[0,256])
+        P = (hist / 19200.0).flatten()
+        median_hist =  cv2.medianBlur(P, 3).flatten()
+        F = median_hist[median_hist>0]
+        local_maxizers = find_peaks(F)[0]
+        global_maximizer = np.argmax(F)
+        T = np.median(F[local_maxizers[local_maxizers>=global_maximizer]])
+        P[P>T] = T
+        FT = np.cumsum(P)
+        DT = np.floor(255*FT/FT[-1]).astype(np.uint8)
+        eq = DT[quantized]
+        return  eq / 255.0
 
     def _temperature_2_image(self, equalize):
         image = self._normalize_temperature(self.temperature_C_buffer[-1],
