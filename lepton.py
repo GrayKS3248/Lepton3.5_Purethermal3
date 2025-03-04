@@ -708,7 +708,7 @@ class Videowriter():
         valid_name = '{}.avi'.format(rec_name)
         if not os.path.exists(valid_name): return valid_name
         
-        max_append = 1
+        max_append = 999
         for i in range(max_append):
             valid_name = '{}_{:03}.avi'.format(rec_name, i+1)
             if not os.path.exists(valid_name): return valid_name
