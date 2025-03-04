@@ -431,10 +431,13 @@ class Lepton():
             next_vert_at = np.argmax(next_vert_at)
             lines[next_vert_at,1,:] = self.subject_next_vert
             
-        for line in lines:
-            if np.any(np.isnan(line)): break
-            srt =  np.round(line[0]).astype(int)
-            end =  np.round(line[1]).astype(int)
+        for i, line in enumerate(lines):
+            if np.any(np.isnan(line)) and i!=3: break
+            if i==3 and np.any(np.isnan(line)):
+                srt = np.round(lines[i-1][1]).astype(int)
+            else:
+                srt = np.round(line[0]).astype(int)
+            end = np.round(line[1]).astype(int)
             if all(srt==end): continue
             image = cv2.line(image, srt, end, (255,0,255), 1) 
             
