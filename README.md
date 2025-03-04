@@ -93,7 +93,15 @@ python lepton.py -h
 
 # Homography Transform
 
-This software supports post-processing image warping to focus on a quadrilateral region of interest. To 
+This software supports post-processing image warping to focus on a quadrilateral region of interest (qROI). To begin, press `f` while the viewer window is active to open the focus window, shown in cyan. The aspect ratio and size of the focus window are adjusted using the mouse scroll wheel. You can switch between which parameter you are adjusting using the right mouse click. 
+
+Once the focus window is set, use the left mouse button to define the four corners of the qROI, shown in magenta. The corner of the focus box to which the selected qROI corner will be transformed is shown as a magenta dot on one of the focus box corners. Once all four corners are defined, a homography transformation will be applied so the qROI occupies the focus box.
+
+To reset the qROI, press `r`.
+
+To toggle the homography transform, press `f`.
+
+<img title="" src="file:///C:/Users/Grayson/Docs/Repos/Lepton3.5_Purethermal3/media/homography_example.gif" alt="" width="385" data-align="center">
 
 # Common Errors
 
