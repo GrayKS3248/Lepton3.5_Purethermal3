@@ -128,4 +128,4 @@ In some cases, a video may fail to gen generated after the recording is finished
 
 ### Lost Frames Every 3 Minutes
 
-The FLIR Lepton camera uses automatic flat field correction (FFC) during operation to ensure image fidelity and prevent pixel drift. These automatic FFCs occur every 3 minutes and are predicated by a box reading "FFC" in the top left corner of the viewing window. They last approximately 3 seconds during which no thermal data or telemetry are sent by the camera, so these frames are dropped, though the renderer automatically corrects for this to maintain true playback speed.
+The FLIR Lepton camera uses automatic flat field correction (FFC) during operation to ensure image fidelity and prevent pixel drift. These automatic FFCs occur every 3 minutes and are predicated by a box reading "FFC" in the top left corner of the viewing window. They last approximately 3 seconds during which no thermal or telemetry data are transmitted by the camera resulting in dropped frames. This is unavoidable for proper Lepton function. Note the renderer automatically detects the dropped frames and locally adjusts the frame rate to maintain true playback speed.
