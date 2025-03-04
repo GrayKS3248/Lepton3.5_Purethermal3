@@ -101,7 +101,9 @@ To reset the qROI, press `r`.
 
 To toggle the homography transform, press `f`.
 
-<img title="" src="file:///C:/Users/Grayson/Docs/Repos/Lepton3.5_Purethermal3/media/homography_example.gif" alt="" width="385" data-align="center">
+![homography](https://github.com/GrayKS3248/Lepton3.5_Purethermal3/blob/main/media/homography_example.gif)
+
+
 
 # Common Errors
 
