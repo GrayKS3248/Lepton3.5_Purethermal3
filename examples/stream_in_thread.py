@@ -10,11 +10,11 @@ import time
 PORT = 0
 CMAP = 'white_hot'
 SCALE_FACTOR = 4
-RECORD = False
+RECORD = True
 FPS = None
 DETECT = True
 MULTIFRAME = True
-EQUALIZE = True
+EQUALIZE = False
 
 if __name__ == "__main__":   
     # Initialize lepton camera

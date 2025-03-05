@@ -84,7 +84,8 @@ def decode_recording_data(dirpath='temp', telemetry_file='telem.json',
     
     with open(os.path.join(dirpath, telemetry_file), 'r') as f:
         telems = _read_DELIMed(f, 'r')
-    timestamps_ms=[ast.literal_eval(''.join(t))['Uptime (ms)'] for t in telems]
+    telems=[ast.literal_eval(''.join(t)) for t in telems]
+    timestamps_ms=[t['Uptime (ms)'] for t in telems]
     
     with open(os.path.join(dirpath, temperature_file), 'rb') as f:
         temperatures_mK = _read_DELIMed(f, 'rb')
@@ -96,7 +97,8 @@ def decode_recording_data(dirpath='temp', telemetry_file='telem.json',
     
     data = {'Temperature (C)' : temperatures_C,
             'Mask' : masks,
-            'Timestamp (ms)' : timestamps_ms,}
+            'Timestamp (ms)' : timestamps_ms,
+            'Telemetry': telems}
     return data
 
 
@@ -176,80 +178,100 @@ class Capture():
             return
         
     def _decode_data(self, raw_data):
-        temperature_C = raw_data[:-2] * 0.01 - 273.15
-        row_A = raw_data[-2,:]        
+        temp_C = raw_data[:-2] * 0.01 - 273.15
         
-        telem_revision = '{}.{}'.format(*struct.unpack("<2b", row_A[0]))
-        uptime_ms = struct.unpack("<I", row_A[1:3])[0]
-        status = struct.unpack("<I", row_A[3:5])[0]
-        FFC_desired = status & 8
-        if FFC_desired == 0: FFC_desired = "not desired"
-        elif FFC_desired == 8: FFC_desired = "desired"
-        FFC_state = status & 48
-        if FFC_state == 0: FFC_state = "never commanded"
-        elif FFC_state == 16: FFC_state = "imminent"
-        elif FFC_state == 32: FFC_state = "in progress"
-        elif FFC_state == 48: FFC_state = "complete"
-        AGC_state = status & 4096
-        if AGC_state == 0: AGC_state = "disabled"
-        elif AGC_state == 4096: AGC_state = "enabled"
-        shutter_lockout = status & 32768
-        if shutter_lockout == 0: shutter_lockout = "not locked out"
-        elif shutter_lockout == 32768: shutter_lockout = "locked out"
-        overtemp_shutdown = status & 1048576
-        if overtemp_shutdown == 0: overtemp_shutdown = "not imminent"
-        elif overtemp_shutdown == 1048576: overtemp_shutdown = "within 10s"
-        serial = struct.unpack("<2Q", row_A[5:13])[0]
-        rev = struct.unpack("<6Bh", row_A[13:17])
-        GPP_rev = '{}.{}.{}'.format(rev[0], rev[1], rev[2])
-        DSP_rev = '{}.{}.{}'.format(rev[3], rev[4], rev[5])
-        frame_count = struct.unpack("<I", row_A[20:22])[0]
-        FPA_temp_C = struct.unpack("<H", row_A[24])[0]*0.01 - 273.15
-        FPA_temp_C = round(FPA_temp_C,2)
-        housing_temp_C = struct.unpack("<H", row_A[26])[0]*0.01 - 273.15
-        housing_temp_C = round(housing_temp_C,2)
-        FPA_temp_C_last_FFC = struct.unpack("<H", row_A[29])[0]*0.01 - 273.15
-        FPA_temp_C_last_FFC = round(FPA_temp_C_last_FFC,2)
-        uptime_ms_last_FFC =  struct.unpack("<H", row_A[30])[0]
-        house_temp_C_last_FFC = struct.unpack("<H", row_A[32])[0]
-        house_temp_C_last_FFC = house_temp_C_last_FFC*0.01 - 273.15
-        house_temp_C_last_FFC = round(house_temp_C_last_FFC,2)
-        AGC_ROI_tlbr = struct.unpack("<4H", row_A[34:38])
-        AGC_clip_hi_px_ct = struct.unpack("<H", row_A[38])[0]
-        AGC_clip_lo_px_ct = struct.unpack("<H", row_A[39])[0]
-        video_format = struct.unpack("<I", row_A[72:74])[0]
-        if video_format == 3: video_format = 'RGB888'
-        elif video_format == 7: video_format = 'RAW14'
-        else: video_format = ''
-        mn_temp_C = float(round(np.min(temperature_C), 2))
-        me_temp_C = float(round(np.mean(temperature_C), 2))
-        mx_temp_C = float(round(np.max(temperature_C), 2))
+        row_A = raw_data[-2,:80]
+        row_B = raw_data[-2,80:]
+        row_C = raw_data[-1,:80]
+        adat=struct.unpack("<bbIIQ8x6Bh6xI4xHxxH4xHHxxHxx6H64xI12x", row_A)
+        bdat=struct.unpack("<38x8H106x", row_B)
+        cdat=struct.unpack("<10x5H8xHH12x4H44x?x9H44x", row_C)
+        
+        status = ['', ]*5
+        if adat[3] & 8 == 0: status[0] = "not desired"
+        elif adat[3] & 8 == 8: status[0] = "desired"
+        
+        if adat[3] & 48 == 0: status[1] = "never commanded"
+        elif adat[3] & 48 == 16: status[1] = "imminent"
+        elif adat[3] & 48 == 32: status[1] = "in progress"
+        elif adat[3] & 48 == 48: status[1] = "complete"
+        
+        if adat[3] & 4096 == 0: status[2] = "disabled"
+        elif adat[3] & 4096 == 4096: status[2] = "enabled"
+        
+        if adat[3] & 32768 == 0: status[3] = "not locked out"
+        elif adat[3] & 32768 == 32768: status[3] = "locked out"
+        
+        if adat[3] & 1048576 == 0: status[4] = "not imminent"
+        elif adat[3] & 1048576 == 1048576: status[4] = "within 10s"
 
-        telemetry = {'Telemetry version' : telem_revision,
-                     'Uptime (ms)' : uptime_ms,
-                     'FFC desired' : FFC_desired,
-                     'FFC state' : FFC_state,
-                     'AGC state' : AGC_state,
-                     'Shutter lockout' : shutter_lockout,
-                     'Overtemp shutdown' : overtemp_shutdown,
-                     'Serial number' : serial,
-                     'g++ version' : GPP_rev,
-                     'dsp version' : DSP_rev,
-                     'Frame count since reboot' : frame_count,
-                     'FPA temperature (C)' : FPA_temp_C,
-                     'Housing temperature (C)' : housing_temp_C,
-                     'FPA temperature at last FFC (C)' : FPA_temp_C_last_FFC,
-                     'Uptime at last FFC (ms)' : uptime_ms_last_FFC,
-                     'Housing temperature at last FFC' : house_temp_C_last_FFC,
-                     'AGC ROI (top left bottom right)' : AGC_ROI_tlbr,
-                     'AGC clip high' : AGC_clip_hi_px_ct,
-                     'AGC clip low' : AGC_clip_lo_px_ct,
-                     'Video format' : video_format,
-                     'Frame min temperature (C)' : mn_temp_C,
-                     'Frame mean temperature (C)' : me_temp_C,
-                     'Frame max temperature (C)' : mx_temp_C,}         
-
-        return temperature_C, telemetry
+        video_format = ''
+        if adat[24] == 3: video_format = 'RGB888'
+        elif adat[24] == 7: video_format = 'RAW14'
+        
+        gain_mode = ''
+        if cdat[0] == 0: gain_mode = 'high'
+        elif cdat[0] == 1: gain_mode = 'low'
+        elif cdat[0] == 2: gain_mode = 'auto'
+        
+        eff_gain_mode = ''
+        if cdat[1] == 0: eff_gain_mode = 'high'
+        elif cdat[1] == 1: eff_gain_mode = 'low'
+        if cdat[0] != 2: eff_gain_mode = 'not in auto mode'
+        
+        desired_gain_mode = ''
+        if cdat[2] == 0: desired_gain_mode = gain_mode
+        elif cdat[2] == 1 and cdat[0] == 0: desired_gain_mode = 'low'
+        elif cdat[2] == 1 and cdat[0] == 1: desired_gain_mode = 'high'
+        
+        telemetry = {
+            'Telemetry version':'{}.{}'.format(adat[0], adat[1]),
+            'Uptime (ms)':adat[2],
+            'FFC desired':status[0],
+            'FFC state':status[1],
+            'AGC state':status[2],
+            'Shutter lockout':status[3],
+            'Overtemp shutdown':status[4],
+            'Serial number':adat[4],
+            'g++ version':'{}.{}.{}'.format(adat[5],adat[6],adat[7]),
+            'dsp version':'{}.{}.{}'.format(adat[9],adat[10],adat[11]),
+            'Frame count since reboot':adat[12],
+            'FPA temperature (C)':round(adat[13]*0.01 - 273.15, 2),
+            'Housing temperature (C)':round(adat[14]*0.01 - 273.15, 2),
+            'FPA temperature at last FFC (C)':round(adat[15]*0.01-273.15, 2),
+            'Uptime at last FFC (ms)':adat[16],
+            'Housing temperature at last FFC':round(adat[17]*0.01-273.15,2),
+            'AGC ROI (top left bottom right)':adat[18:22],
+            'AGC clip high':adat[22],
+            'AGC clip low':adat[23],
+            'Video format':video_format,
+            'Frame min temperature (C)':float(round(np.min(temp_C),2)),
+            'Frame mean temperature (C)':float(round(np.mean(temp_C), 2)),
+            'Frame max temperature (C)':float(round(np.max(temp_C), 2)),
+            'Assumed emissivity':round(bdat[0]/8192,2),
+            'Assumed background temperature (C)':round(0.01*bdat[1]-273.15,2),
+            'Assumed atmospheric transmission':round(bdat[2]/8192,2),
+            'Assumed atmospheric temperature (C)':round(0.01*bdat[3]-273.15,2),
+            'Assumed window transmission':round(bdat[4]/8192,2),
+            'Assumed window reflection':round(bdat[5]/8192,2),
+            'Assumed window temperature (C)':round(0.01*bdat[6]-273.15,2),
+            'Assumed reflected temperature (C)':round(0.01*bdat[7]-273.15,2),
+            'Gain mode':gain_mode,
+            'Effective gain mode':eff_gain_mode,
+            'Desired gain mode':desired_gain_mode,
+            'Temperature switch high gain to low gain (C)':cdat[3],
+            'Temperature switch low gain to high gain (C)':cdat[4],
+            'Population switch high gain to low gain (%)':cdat[5],
+            'Population switch low gain to high gain (%)':cdat[6],
+            'Gain mode ROI (top left bottom right)':cdat[7:11],
+            'TLinear enabled':str(cdat[11]),
+            'TLinear resolution':round(-0.09*cdat[12]+0.1,2),
+            'Spotmeter max temperature (C)':round(0.01*cdat[13]-273.15,2),
+            'Spotmeter mean temperature (C)':round(0.01*cdat[14]-273.15,2),
+            'Spotmeter min temperature (C)':round(0.01*cdat[15]-273.15,2),
+            'Spotmeter population (px)':cdat[16],
+            'Spotmeter ROI (top left bottom right)':cdat[17:],}
+        return temp_C, telemetry
     
     def read(self):
         self._wait_4_frametime()
