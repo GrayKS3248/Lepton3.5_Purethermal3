@@ -23,6 +23,7 @@ import argparse
 import traceback
 import textwrap
 import inspect
+from dataclasses import dataclass
 
 
 def _safe_run(function, stop_function=None, args=(), stop_args=()):
@@ -126,16 +127,17 @@ class InvalidNameException(Exception):
         return str(self.message)
 
 
+@dataclass
 class Clr:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
+    HEADER: str = '\033[95m'
+    OKBLUE: str = '\033[94m'
+    OKCYAN: str = '\033[96m'
+    OKGREEN: str = '\033[92m'
+    WARNING: str = '\033[93m'
+    FAIL: str = '\033[91m'
+    ENDC: str = '\033[0m'
+    BOLD: str = '\033[1m'
+    UNDERLINE: str = '\033[4m'
 
 
 class Capture():
@@ -430,7 +432,8 @@ class Lepton():
         if any(next_vert_at):
             next_vert_at = np.argmax(next_vert_at)
             lines[next_vert_at,1,:] = self.subject_next_vert
-            
+        
+        roi_image = copy(image)
         for i, line in enumerate(lines):
             if np.any(np.isnan(line)) and i!=3: break
             if i==3 and np.any(np.isnan(line)):
@@ -439,10 +442,10 @@ class Lepton():
                 srt = np.round(line[0]).astype(int)
             end = np.round(line[1]).astype(int)
             if all(srt==end): continue
-            image = cv2.line(image, srt, end, (255,0,255), 1) 
+            roi_image = cv2.line(roi_image, srt, end, (255,0,255), 1) 
             
         quad_done = not np.any(np.isnan(line))
-        return image, quad_done
+        return roi_image, quad_done
     
     def _draw_focus_box(self, image):
         img_h, img_w = image.shape[0], image.shape[1] 
@@ -453,69 +456,68 @@ class Lepton():
         r = l + box_w - 1
         b = t + box_h - 1
         self.focus_box = [(l,t),(l,b),(r,b),(r,t)]
-        image = cv2.rectangle(image,self.focus_box[0],self.focus_box[2],
-                              [0,255,255],1)
+        fb_image = cv2.rectangle(image,self.focus_box[0],self.focus_box[2],
+                                 [0,255,255],1)
         
         cnr=[i for i,s in enumerate(self.subject_quad) if s!=(np.nan, np.nan)]
         cnr = len(cnr)
         if cnr < 4:
-            image = cv2.circle(image, self.focus_box[cnr], 3, [255,0,255], -1)
+            fb_image = cv2.circle(fb_image, self.focus_box[cnr], 
+                                  3, [255,0,255], -1)
             
         if self.switch_AR:
             txt = 'AR: {:.2f}'.format(self.focus_box_AR)
-            image = cv2.rectangle(image,(l+2,t+2),(l+75,t+15),[0,0,0],-1)
+            fb_image = cv2.rectangle(fb_image,(l+2,t+2),(l+75,t+15),[0,0,0],-1)
         else:
             txt = 'Size: {:.2f}'.format(self.focus_box_size)
-            image = cv2.rectangle(image,(l+2,t+2),(l+89,t+15),[0,0,0],-1)
-        image = cv2.putText(image, txt, (l+4,t+14),
-                             cv2.FONT_HERSHEY_PLAIN , 1, (255,255,255), 1,
-                             cv2.LINE_AA)
+            fb_image = cv2.rectangle(fb_image,(l+2,t+2),(l+89,t+15),[0,0,0],-1)
+        fb_image = cv2.putText(fb_image, txt, (l+4,t+14),
+                               cv2.FONT_HERSHEY_PLAIN , 1, (255,255,255), 1,
+                               cv2.LINE_AA)
         
-        return image
+        return fb_image
     
     def _focus_box(self, image):
-        image, quad_done = self._draw_subject_quad(image)
+        if not self.flag_focus_box:
+            return image, False
         
-        if not quad_done: 
-            image = self._draw_focus_box(image)
-            self.H = None
-            return image
+        focus_image, quad_done = self._draw_subject_quad(image)
+        focus_image = self._draw_focus_box(focus_image)
+        if not quad_done: return focus_image, False
             
         if self.H is None:
             xs = np.array(self.subject_quad)
             ys = np.array(self.focus_box)
             self.H, _ = cv2.findHomography(xs, ys)
-            
-        image = cv2.warpPerspective(image, self.H, (image.shape[1],
-                                                    image.shape[0]))
-        return image
+
+        shp = (image.shape[1], image.shape[0])
+        warped_image = cv2.warpPerspective(image, self.H, shp)
+        return warped_image, True
         
     def _show(self):
-        image = self.image_buffer[-1]
+        image = copy(self.image_buffer[-1])
         mask = self.mask_buffer[-1]
         
         if not mask is None:
             image[mask] = [0,255,0]
             
         shp = (image.shape[1]*self.SHOW_SCALE, image.shape[0]*self.SHOW_SCALE)
-        scaled_image = cv2.resize(image, shp, interpolation=cv2.INTER_LINEAR)
+        image = cv2.resize(image, shp, interpolation=cv2.INTER_LINEAR)
         
-        if self.flag_focus_box:
-            focused_image = self._focus_box(scaled_image)
-        else:
-            focused_image = copy(scaled_image)
-        
-        telem_img = self._telemetrize_image(focused_image)
-        self.image_buffer[-1] = copy(telem_img)
-        
+        show_im, warped = self._focus_box(image)
+        if warped: rec_im = copy(show_im)
+        else: rec_im = copy(image)
+            
         if self.flag_recording:
-            show_img = cv2.circle(telem_img,
-                                  (telem_img.shape[1]-10,10),5,[255,0,0],-1)
-        else:
-            show_img = copy(telem_img)
-
-        show_img = cv2.cvtColor(show_img, cv2.COLOR_BGR2RGB)
-        cv2.imshow(self.WINDOW_NAME, show_img) 
+            show_im = cv2.circle(show_im,
+                                  (show_im.shape[1]-10,10),5,[255,0,0],-1)
+        
+        show_im = self._telemetrize_image(show_im)
+        show_im = cv2.cvtColor(show_im, cv2.COLOR_BGR2RGB)
+        cv2.imshow(self.WINDOW_NAME, show_im) 
+        
+        rec_im = self._telemetrize_image(rec_im)
+        self.image_buffer[-1] = rec_im
 
     def _estop_stream(self):
         print(Clr.WARNING+"Emergency stopping stream... "+Clr.ENDC, end="")
@@ -524,7 +526,7 @@ class Lepton():
         cv2.destroyAllWindows()
         print(Clr.FAIL+"Stopped."+Clr.ENDC)
 
-    def _keypress_callback(self, wait=50):      
+    def _keypress_callback(self, wait=1):      
         key = cv2.waitKeyEx(wait)
 
         if key == ord('f'):
