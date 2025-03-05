@@ -734,14 +734,31 @@ class Lepton():
         return _safe_run(self._record, self._estop_record, 
                          args=(fps, detect_fronts, multiframe, equalize))
     
-    def get_temperature(self):
+    def get_temperature(self, focused_ok=False):
         if len(self.temperature_C_buffer) > 0:
-            return self.temperature_C_buffer[-1]
+            temp = self.temperature_C_buffer[-1]
+            if focused_ok and self.flag_focus_box and (not self.H is None):
+                shp = (temp.shape[1]*self.SHOW_SCALE,
+                       temp.shape[0]*self.SHOW_SCALE)
+                s_temp = cv2.resize(temp, shp, interpolation=cv2.INTER_LINEAR)
+                (l,t) = self.focus_box[0]
+                (r,b) = self.focus_box[2]
+                return cv2.warpPerspective(s_temp, self.H, shp)[t:b+1,l:r+1]
+            return temp
         return None
     
-    def get_front_mask(self):
+    def get_front_mask(self, focused_ok=False):
         if len(self.mask_buffer) > 0:
-            return self.mask_buffer[-1]
+            mask = self.mask_buffer[-1]
+            if focused_ok and self.flag_focus_box and (not self.H is None):
+                shp = (mask.shape[1]*self.SHOW_SCALE,
+                       mask.shape[0]*self.SHOW_SCALE)
+                s_mask = cv2.resize(mask.astype(float), shp, 
+                                    interpolation=cv2.INTER_LINEAR)
+                (l,t) = self.focus_box[0]
+                (r,b) = self.focus_box[2]
+                return cv2.warpPerspective(s_mask, self.H, shp)[t:b+1,l:r+1]>.5
+            return mask
         return None
     
     def get_time(self):

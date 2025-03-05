@@ -8,13 +8,13 @@ import threading
 import time
 
 PORT = 0
-CMAP = 'ironbow'
-SCALE_FACTOR = 3
-RECORD = True
+CMAP = 'white_hot'
+SCALE_FACTOR = 4
+RECORD = False
 FPS = None
 DETECT = True
 MULTIFRAME = True
-EQUALIZE = False
+EQUALIZE = True
 
 if __name__ == "__main__":   
     # Initialize lepton camera
@@ -36,9 +36,11 @@ if __name__ == "__main__":
         curr_frame = lepton.get_frame_number()
         curr_time = lepton.get_time()
         if curr_frame > prev_frame and not curr_time is None:
-            print("Frame {} @ {:.3f}s".format(curr_frame, curr_time))
+            temperature = lepton.get_temperature(focused_ok=True)
+            mask = lepton.get_front_mask(focused_ok=True)
+            
         prev_frame = curr_frame
-        time.sleep(0.01) # Remove some CPU stress
+        time.sleep(1./90.) # Remove some CPU stress
         
     # Join the Lepton thread
     thread1.join()
@@ -47,4 +49,4 @@ if __name__ == "__main__":
     if RECORD:
         writer = Videowriter()
         writer.make_video()
-        data = decode_recording_data()
+        raw_data = decode_recording_data()
