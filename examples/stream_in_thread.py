@@ -6,11 +6,13 @@ from lepton import decode_recording_data
 sys.path.pop(-1)
 import threading
 import time
+import matplotlib.pyplot as plt
+import numpy as np
 
 PORT = 0
-CMAP = 'white_hot'
+CMAP = 'viridis'
 SCALE_FACTOR = 4
-RECORD = True
+RECORD = False
 FPS = None
 DETECT = True
 MULTIFRAME = True
@@ -33,14 +35,17 @@ if __name__ == "__main__":
     # Do other things while Lepton is streaming
     prev_frame = -1
     while lepton.is_streaming():
-        curr_frame = lepton.get_frame_number()
-        curr_time = lepton.get_time()
-        if curr_frame > prev_frame and not curr_time is None:
-            temperature = lepton.get_temperature(focused_ok=True)
-            mask = lepton.get_front_mask(focused_ok=True)
+        frame_data = lepton.get_frame_data()
+        if frame_data[0] > prev_frame and not frame_data[1] is None:
+            temperature = frame_data[2]
+            mask = frame_data[3]
+            if np.any(mask):
+                temperature[mask]=np.inf
+            plt.imshow(temperature)
+            plt.show()
             
-        prev_frame = curr_frame
-        time.sleep(1./90.) # Remove some CPU stress
+        prev_frame = frame_data[0]
+        time.sleep(0.0111) # Remove some CPU stress
         
     # Join the Lepton thread
     thread1.join()
