@@ -34,14 +34,14 @@ def _safe_run(function, stop_function=None, args=(), stop_args=()):
         if not stop_function is None: stop_function(*stop_args)
         msg = '\n'.join(textwrap.wrap(str(e), 80))
         bars = ''.join(['-']*80)
-        s = ("{}{}{}\n".format(Clr.FAIL,bars,Clr.ENDC),
-             "{}{}{}\n".format(Clr.FAIL,type(e).__name__,Clr.ENDC),
+        s = ("{}{}{}\n".format(ESC.FAIL,bars,ESC.ENDC),
+             "{}{}{}\n".format(ESC.FAIL,type(e).__name__,ESC.ENDC),
              "In function: ",
-             "{}{}(){}\n".format(Clr.OKBLUE, function.__name__, Clr.ENDC),
-             "{}{}{}\n".format(Clr.WARNING,  msg, Clr.ENDC),
-             "{}{}{}".format(Clr.FAIL,bars,Clr.ENDC),)
+             "{}{}(){}\n".format(ESC.OKBLUE, function.__name__, ESC.ENDC),
+             "{}{}{}\n".format(ESC.WARNING,  msg, ESC.ENDC),
+             "{}{}{}".format(ESC.FAIL,bars,ESC.ENDC),)
         
-        print("{}{}{}".format(Clr.FAIL, bars, Clr.ENDC))
+        print("{}{}{}".format(ESC.FAIL, bars, ESC.ENDC))
         traceback.print_exc()
         print(''.join(s))
         return -1
@@ -139,7 +139,7 @@ class BufferLengthException(Exception):
 
 
 @dataclass
-class Clr:
+class ESC:
     HEADER: str = '\033[95m'
     OKBLUE: str = '\033[94m'
     OKCYAN: str = '\033[96m'
@@ -632,11 +632,11 @@ class Lepton():
             self.flag_streaming = False
 
     def _estop_stream(self):
-        print(Clr.WARNING+"Emergency stopping stream... "+Clr.ENDC, end="")
+        print(ESC.WARNING+"Emergency stopping stream... "+ESC.ENDC, end="")
         self.flag_emergency_stop = True
         self.flag_streaming = False
         cv2.destroyAllWindows()
-        print(Clr.FAIL+"Stopped."+Clr.ENDC)
+        print(ESC.FAIL+"Stopped."+ESC.ENDC)
 
     def _stream(self, fps, detect_fronts, multiframe, equalize):
         with Capture(self.PORT, fps) as self.cap:
@@ -728,10 +728,10 @@ class Lepton():
     
     def _estop_record(self):
         self._estop_stream()
-        print(Clr.WARNING+"Emergency stopping record... "+Clr.ENDC, end="")
+        print(ESC.WARNING+"Emergency stopping record... "+ESC.ENDC, end="")
         self.flag_emergency_stop = True
         self.flag_recording = False
-        print(Clr.FAIL+"Stopped."+Clr.ENDC)
+        print(ESC.FAIL+"Stopped."+ESC.ENDC)
     
     def _record(self, fps, detect_fronts, multiframe, equalize):
         dirname = 'temp'
@@ -788,7 +788,7 @@ class Lepton():
         if not self.flag_emergency_stop:
             self.flag_emergency_stop = True
             msg="{}EMERGENCY STOP COMMAND RECEIVED{}"
-            print(msg.format(Clr.FAIL, Clr.ENDC))        
+            print(msg.format(ESC.FAIL, ESC.ENDC))        
 
     def start_stream(self, fps=None, detect_fronts=False, multiframe=True, 
                      equalize=False):
@@ -894,14 +894,14 @@ class Videowriter():
             msg = '\n'.join(textwrap.wrap(str(e), 80))
             bars = ''.join(['-']*80)
             fnc_name = inspect.currentframe().f_code.co_name
-            s = ("{}{}{}\n".format(Clr.FAIL,bars,Clr.ENDC),
-                 "{}{}{}\n".format(Clr.FAIL,type(e).__name__,Clr.ENDC),
+            s = ("{}{}{}\n".format(ESC.FAIL,bars,ESC.ENDC),
+                 "{}{}{}\n".format(ESC.FAIL,type(e).__name__,ESC.ENDC),
                  "In function: ",
-                 "{}{}(){}\n".format(Clr.OKBLUE, fnc_name, Clr.ENDC),
-                 "{}{}{}\n".format(Clr.WARNING,  msg, Clr.ENDC),)
+                 "{}{}(){}\n".format(ESC.OKBLUE, fnc_name, ESC.ENDC),
+                 "{}{}{}\n".format(ESC.WARNING,  msg, ESC.ENDC),)
             print(''.join(s))
             rec_name = input('Please enter a different name: ')
-            print("{}{}{}".format(Clr.FAIL,bars,Clr.ENDC))
+            print("{}{}{}".format(ESC.FAIL,bars,ESC.ENDC))
             return self._get_valid_name(rec_name)
 
     def _make_video(self, rec_name, dirpath, telemetry_file, image_file):
@@ -952,7 +952,7 @@ if __name__ == "__main__":
     
     if not args.fps is None and args.fps < 5:
         wstr="Target FPS set below 5 can result in erroneous video rendering."
-        print(Clr.WARNING+'WARNING: '+wstr+Clr.ENDC)
+        print(ESC.WARNING+'WARNING: '+wstr+ESC.ENDC)
 
     lepton = Lepton(args.port, args.cmap, args.scale_factor)
     if not args.record:
