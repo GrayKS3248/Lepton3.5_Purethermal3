@@ -51,7 +51,7 @@ def _parse_args():
     parser.add_argument('-p', '--port', help="Lepton camera port", 
                         type=int, default=0)
     parser.add_argument('-r', "--record", help="record data stream", 
-                        action=argparse.BooleanOptionalAction, default=True)
+                        action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument('-n', "--name", help="name of saved video file", 
                         type=str, default="recording")
     parser.add_argument('-c', "--cmap", help="colormap used in viewer", 
@@ -67,7 +67,7 @@ def _parse_args():
                         help="apply histogram equalization to image", 
                         action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument('-d', "--detect", help="if moving fronts are detected", 
-                        action=argparse.BooleanOptionalAction, default=True)
+                        action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument('-m', "--multiframe", help="detection type", 
                         action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument('-f', "--fps", help="target FPS of camera", 
@@ -375,7 +375,7 @@ class Lepton():
         warped_buffer = []
         for i in range(buffer_len):
             if i > 2: break
-            element = copy(buffer[buffer_len-1-i])
+            element = copy(buffer[buffer_len-1-i]).astype(float)
             shp = (element.shape[1]*self.SHOW_SCALE,
                    element.shape[0]*self.SHOW_SCALE)
             element = cv2.resize(element, shp)
@@ -817,7 +817,7 @@ class Lepton():
         with self.LOCK:
             return self._buf_len() > 1
     
-    def wait_until_stream_active(self, timeout_ms=5000.0, dt_ms=11.1):
+    def wait_until_stream_active(self, timeout_ms=5000., dt_ms=25.):
         return _safe_run(self._wait_until, args=(self._buffers_populated,
                                                  timeout_ms, dt_ms))   
     
@@ -842,7 +842,7 @@ class Lepton():
             temperature_C = self._warped_element(self.temperature_C_buffer, 
                                                  return_buffer=False)
             mask = self._warped_element(self.mask_buffer, 
-                                        return_buffer=False)
+                                        return_buffer=False) > 0.25
             return (frame_number, time, temperature_C, mask, )
     
 
