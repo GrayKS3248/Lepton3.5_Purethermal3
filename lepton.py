@@ -375,7 +375,14 @@ class Lepton():
         warped_buffer = []
         for i in range(buffer_len):
             if i > 2: break
-            element = copy(buffer[buffer_len-1-i]).astype(float)
+            element = copy(buffer[buffer_len-1-i])
+            
+            if element is None:
+                if not return_buffer: return None
+                warped_buffer.append(None)
+                continue
+            
+            element = element.astype(float)
             shp = (element.shape[1]*self.SHOW_SCALE,
                    element.shape[0]*self.SHOW_SCALE)
             element = cv2.resize(element, shp)
@@ -383,6 +390,7 @@ class Lepton():
             (l,t), (r,b) = self.focus_box[0], self.focus_box[2]
             if not return_buffer: return element[t:b+1,l:r+1]
             warped_buffer.append(element[t:b+1,l:r+1])
+            
         warped_buffer.reverse()
         return warped_buffer
     
@@ -722,9 +730,10 @@ class Lepton():
         files[2].write(image)
         files[2].write(b'DELIM')
         
-        if not mask is None: 
-            files[3].write(zlib.compress(mask.tobytes()))
-            files[3].write(b'DELIM')
+        if mask is None:
+            mask = np.zeros(temperature_C.shape).astype(bool)
+        files[3].write(zlib.compress(mask.tobytes()))
+        files[3].write(b'DELIM')
     
     def _estop_record(self):
         self._estop_stream()
@@ -842,7 +851,8 @@ class Lepton():
             temperature_C = self._warped_element(self.temperature_C_buffer, 
                                                  return_buffer=False)
             mask = self._warped_element(self.mask_buffer, 
-                                        return_buffer=False) > 0.25
+                                        return_buffer=False)
+            if not mask is None: mask = mask >= 0.25
             return (frame_number, time, temperature_C, mask, )
     
 
