@@ -604,17 +604,20 @@ class Lepton():
         key = cv2.waitKeyEx(wait)
 
         if key == ord('f'):
-            self.flag_focus_box = not self.flag_focus_box
+            with self.LOCK:
+                self.flag_focus_box = not self.flag_focus_box
     
         if key == ord('r'):
-            self.subject_quad = [(np.nan,np.nan), (np.nan,np.nan), 
-                                 (np.nan,np.nan), (np.nan,np.nan)]
-            self.subject_next_vert = (np.nan,np.nan)
-            self.homography = None
-            self.inv_homography = None
+            with self.LOCK:
+                self.subject_quad = [(np.nan,np.nan), (np.nan,np.nan), 
+                                     (np.nan,np.nan), (np.nan,np.nan)]
+                self.subject_next_vert = (np.nan,np.nan)
+                self.homography = None
+                self.inv_homography = None
     
         if key == 27:
-            self.flag_streaming = False
+            with self.LOCK:
+                self.flag_streaming = False
 
     def _estop_stream(self):
         print("Emergency stopping stream... ", end="", flush=True)

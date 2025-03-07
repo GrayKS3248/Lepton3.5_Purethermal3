@@ -74,7 +74,7 @@ def terminate(thread):
         writer = Videowriter()
         writer.make_video()
         raw_data = decode_recording_data()
-    return raw_data
+        return raw_data
 
 
 if __name__ == "__main__":   
