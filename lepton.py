@@ -7,6 +7,8 @@ from scipy.signal import find_peaks
 # Package modules
 from detector import Detector
 from cmaps import Cmaps 
+from utilities import ESC
+from utilities import safe_run
 
 # Std modules
 import os
@@ -19,32 +21,10 @@ import json
 from fractions import Fraction
 from copy import copy
 import argparse
-import traceback
 import textwrap
 import inspect
-from dataclasses import dataclass
 from threading import Lock
 
-
-def _safe_run(function, stop_function=None, args=(), stop_args=()):
-    try: 
-        function(*args)
-        return 0
-    except BaseException as e:
-        if not stop_function is None: stop_function(*stop_args)
-        msg = '\n'.join(textwrap.wrap(str(e), 80))
-        bars = ''.join(['-']*80)
-        s = ("{}{}{}\n".format(ESC.FAIL,bars,ESC.ENDC),
-             "{}{}{}\n".format(ESC.FAIL,type(e).__name__,ESC.ENDC),
-             "In function: ",
-             "{}{}(){}\n".format(ESC.OKBLUE, function.__name__, ESC.ENDC),
-             "{}{}{}\n".format(ESC.WARNING,  msg, ESC.ENDC),
-             "{}{}{}".format(ESC.FAIL,bars,ESC.ENDC),)
-        
-        print("{}{}{}".format(ESC.FAIL, bars, ESC.ENDC))
-        traceback.print_exc()
-        print(''.join(s))
-        return -1
 
 def _parse_args():
     parser = argparse.ArgumentParser()
@@ -79,26 +59,35 @@ def _parse_args():
 def decode_recording_data(dirpath='temp', telemetry_file='telem.json',
                           temperature_file='temperature.dat',
                           mask_file='mask.dat'):
+    print("Decoding raw data... ", end='', flush=True)
     _read_DELIMed = Videowriter()._read_DELIMed
     _decode_bytes = Videowriter()._decode_bytes
     
     with open(os.path.join(dirpath, telemetry_file), 'r') as f:
         telems = _read_DELIMed(f, 'r')
-    telems=[ast.literal_eval(''.join(t)) for t in telems]
-    timestamps_ms=[t['Uptime (ms)'] for t in telems]
+    if telems == None:
+        timestamps_ms = None
+    else:
+        telems=[ast.literal_eval(''.join(t)) for t in telems]
+        timestamps_ms=[t['Uptime (ms)'] for t in telems]
     
     with open(os.path.join(dirpath, temperature_file), 'rb') as f:
-        temperatures_mK = _read_DELIMed(f, 'rb')
-    temperatures_C = [0.01*_decode_bytes(t)-273.15 for t in temperatures_mK]
+        t_mK = _read_DELIMed(f, 'rb')
+    if t_mK == None:
+        temperatures_C = None
+    else:
+        temperatures_C = [0.01*_decode_bytes(t)-273.15 for t in t_mK]
     
     with open(os.path.join(dirpath, mask_file), 'rb') as f:
         masks = _read_DELIMed(f, 'rb')
-    masks = [_decode_bytes(m, compressed=True) for m in masks]
+    if masks != None:
+        masks = [_decode_bytes(m, compressed=True) for m in masks]
     
     data = {'Temperature (C)' : temperatures_C,
             'Mask' : masks,
             'Timestamp (ms)' : timestamps_ms,
             'Telemetry': telems}
+    print("{}Done.{}".format(ESC.OKCYAN, ESC.ENDC), flush=True)
     return data
 
 
@@ -136,19 +125,6 @@ class BufferLengthException(Exception):
         
     def __str__(self):
         return str(self.message)
-
-
-@dataclass
-class ESC:
-    HEADER: str = '\033[95m'
-    OKBLUE: str = '\033[94m'
-    OKCYAN: str = '\033[96m'
-    OKGREEN: str = '\033[92m'
-    WARNING: str = '\033[93m'
-    FAIL: str = '\033[91m'
-    ENDC: str = '\033[0m'
-    BOLD: str = '\033[1m'
-    UNDERLINE: str = '\033[4m'
 
 
 class Capture():
@@ -321,6 +297,7 @@ class Lepton():
         self.image_buffer = deque()
         self.mask_buffer = deque()
         self.frame_number = 0
+        self.frame_num_prev_send = -1
         
         self.flag_streaming = False
         self.flag_recording = False
@@ -640,11 +617,11 @@ class Lepton():
             self.flag_streaming = False
 
     def _estop_stream(self):
-        print(ESC.WARNING+"Emergency stopping stream... "+ESC.ENDC, end="")
+        print("Emergency stopping stream... ", end="", flush=True)
         self.flag_emergency_stop = True
         self.flag_streaming = False
         cv2.destroyAllWindows()
-        print(ESC.FAIL+"Stopped."+ESC.ENDC)
+        print(ESC.OKCYAN+"Stopped."+ESC.ENDC, flush=True)
 
     def _stream(self, fps, detect_fronts, multiframe, equalize):
         with Capture(self.PORT, fps) as self.cap:
@@ -655,6 +632,7 @@ class Lepton():
             self.flag_streaming = True
             cv2.namedWindow(self.WINDOW_NAME, cv2.WINDOW_AUTOSIZE) 
             cv2.setMouseCallback(self.WINDOW_NAME, self._mouse_callback)
+            print("Stream started... ", flush=True)
             while self.flag_streaming:
                 if self.flag_emergency_stop:
                     self._estop_stream()
@@ -674,6 +652,7 @@ class Lepton():
                 self._keypress_callback()
                 
             cv2.destroyAllWindows()
+        print("{}Stream ended.{}".format(ESC.OKCYAN, ESC.ENDC), flush=True)
     
     def _buf_len(self):
         l1 = len(self.temperature_C_buffer)
@@ -737,10 +716,10 @@ class Lepton():
     
     def _estop_record(self):
         self._estop_stream()
-        print(ESC.WARNING+"Emergency stopping record... "+ESC.ENDC, end="")
+        print("Emergency stopping record... ", end="", flush=True)
         self.flag_emergency_stop = True
         self.flag_recording = False
-        print(ESC.FAIL+"Stopped."+ESC.ENDC)
+        print(ESC.OKCYAN+"Stopped."+ESC.ENDC, flush=True)
     
     def _record(self, fps, detect_fronts, multiframe, equalize):
         dirname = 'temp'
@@ -762,6 +741,7 @@ class Lepton():
             cv2.namedWindow(self.WINDOW_NAME, cv2.WINDOW_AUTOSIZE) 
             cv2.setMouseCallback(self.WINDOW_NAME, self._mouse_callback)
             files = (T_file, t_file, i_file, m_file, )
+            print("Recording started... ", flush=True)
             while self.flag_streaming:
                 if self.flag_emergency_stop:
                     self._estop_record()
@@ -790,24 +770,25 @@ class Lepton():
                     term_frame_data.append(frame_data)
             for frame_data in term_frame_data:
                 self._write_frame(frame_data, files)
-                
-            self.recording=False    
+            
+        self.recording=False    
+        print("{}Recording ended.{}".format(ESC.OKCYAN, ESC.ENDC), flush=True)
     
     def emergency_stop(self):
         if not self.flag_emergency_stop:
             self.flag_emergency_stop = True
             msg="{}EMERGENCY STOP COMMAND RECEIVED{}"
-            print(msg.format(ESC.FAIL, ESC.ENDC))        
+            print(msg.format(ESC.FAIL, ESC.ENDC), flush=True)        
 
     def start_stream(self, fps=None, detect_fronts=False, multiframe=True, 
                      equalize=False):
-        return _safe_run(self._stream, self._estop_stream,
-                         args=(fps, detect_fronts, multiframe, equalize, ))     
+        return safe_run(self._stream, self._estop_stream,
+                        args=(fps, detect_fronts, multiframe, equalize, ))     
 
     def start_record(self, fps=None, detect_fronts=False, multiframe=True, 
                      equalize=False):
-        return _safe_run(self._record, self._estop_record, 
-                         args=(fps, detect_fronts, multiframe, equalize))
+        return safe_run(self._record, self._estop_record, 
+                        args=(fps, detect_fronts, multiframe, equalize))
     
     def _wait_until(self, condition, timeout_ms, dt_ms):
         epoch_s = time.time()
@@ -827,8 +808,8 @@ class Lepton():
             return self._buf_len() > 1
     
     def wait_until_stream_active(self, timeout_ms=5000., dt_ms=25.):
-        return _safe_run(self._wait_until, args=(self._buffers_populated,
-                                                 timeout_ms, dt_ms))   
+        return safe_run(self._wait_until, args=(self._buffers_populated,
+                                                timeout_ms, dt_ms))   
     
     def is_streaming(self):
         return copy(self.flag_streaming)
@@ -836,24 +817,81 @@ class Lepton():
     def is_recording(self):
         return copy(self.flag_recording)
     
-    def get_frame_data(self, focused_ok=False):
+    def _frame_data_to_bytes(self, frame_data):
+        frame_num = frame_data[0]
+        time_stamp = frame_data[1]
+        temperature_mK = frame_data[2]
+        mask = frame_data[3]
+        
+        if frame_num is None:
+            f_data = b''
+        else:
+            f_data = np.uint64(frame_num).tobytes()
+        
+        if time_stamp is None:
+            t_data = b''
+        else:
+            t_data = np.uint64(time_stamp).tobytes()
+        
+        if temperature_mK is None:
+            T_data = b''
+        else:
+            T_data = np.insert(temperature_mK.flatten(),0,
+                               temperature_mK.shape).tobytes()
+            T_data = zlib.compress(T_data)
+        
+        if mask is None: 
+            m_data = b''
+        else:
+            m_data = np.insert(mask.flatten(),0,mask.shape).tobytes()
+            m_data = zlib.compress(m_data)
+        
+        return  (f_data, t_data, T_data, m_data, )
+    
+    def _get_frame_data(self, focused_ok):
         with self.LOCK:
             frame_number = copy(self.frame_number)
+            if frame_number <= self.frame_num_prev_send:
+                return (None, None, None, None, )
+            self.frame_num_prev_send = frame_number
+            
             if self._buf_len() == 0:
                 return (frame_number, None, None, None, )
             
             time = round(copy(self.telemetry_buffer[-1]['Uptime (ms)'])*.001,3)
             if not focused_ok:
                 temperature_C = copy(self.temperature_C_buffer[-1])
-                mask = copy(self.mask_buffer[-1])
-                return (frame_number, time, temperature_C, mask, )
+                temperature_mK = np.round(100*(temperature_C+273.15))
+                temperature_mK = temperature_mK.astype(np.uint16)
+                mask = copy(self.mask_buffer[-1]).astype(np.uint16)
+                return (frame_number, time, temperature_mK, mask, )
             
             temperature_C = self._warped_element(self.temperature_C_buffer, 
                                                  return_buffer=False)
             mask = self._warped_element(self.mask_buffer, 
                                         return_buffer=False)
-            if not mask is None: mask = mask >= 0.25
-            return (frame_number, time, temperature_C, mask, )
+            
+            if not self.flag_focus_box or self.homography is None:
+                temperature_mK = np.round(100*(temperature_C+273.15))
+                temperature_mK = temperature_mK.astype(np.uint16)
+                if not mask is None:
+                    mask = (mask >= 0.25).astype(np.uint16)
+                return (frame_number, time, temperature_mK, mask, )
+            
+            shp=(int(np.round(temperature_C.shape[1]/self.SHOW_SCALE)),
+                 int(np.round(temperature_C.shape[0]/self.SHOW_SCALE)))
+            temperature_C = cv2.resize(temperature_C, shp)
+            temperature_mK = np.round(100*(temperature_C+273.15))
+            temperature_mK = temperature_mK.astype(np.uint16)
+            if not mask is None:
+                mask = cv2.resize(mask, shp)
+                mask = (mask >= 0.25).astype(np.uint16)
+            return (frame_number, time, temperature_mK, mask, )
+    
+    def get_frame_data(self, focused_ok=False, as_bytes=False):
+        frame_data = self._get_frame_data(focused_ok)
+        if as_bytes: return self._frame_data_to_bytes(frame_data)
+        return frame_data
     
 
 class Videowriter():
@@ -915,10 +953,16 @@ class Videowriter():
             return self._get_valid_name(rec_name)
 
     def _make_video(self, rec_name, dirpath, telemetry_file, image_file):
+        print("Writing video... ", end='', flush=True)
         valid_name = self._get_valid_name(rec_name)
         
         with open(os.path.join(dirpath, telemetry_file), 'r') as f:
             telems = self._read_DELIMed(f, 'r')
+        if telems == None:
+            print("{}No video data found.{}".format(ESC.WARNING, ESC.ENDC),
+                  flush = True)
+            return
+            
         telems = [ast.literal_eval(''.join(t)) for t in telems]
         with open(os.path.join(dirpath, image_file), 'rb') as f:
             images = self._read_DELIMed(f, 'rb')
@@ -930,7 +974,7 @@ class Videowriter():
             vid_stream.pix_fmt = "yuv420p"
             vid_stream.bit_rate = 10_000_000
             vid_stream.codec_context.time_base = Fraction(1, 33)
-           
+
             epoch = None
             prev_time = -np.inf
             for telem, image in zip(telems, images):
@@ -951,11 +995,12 @@ class Videowriter():
                 for packet in vid_stream.encode(frame):
                     container.mux(packet)
                 prev_time = copy(time)
+        print("{}Done.{}".format(ESC.OKCYAN, ESC.ENDC), flush=True)
 
     def make_video(self, rec_name='recording', dirpath='temp', 
                    telemetry_file='telem.json', image_file='image.dat'):
-        return _safe_run(self._make_video, 
-                         args=(rec_name, dirpath, telemetry_file, image_file))
+        return safe_run(self._make_video, 
+                        args=(rec_name, dirpath, telemetry_file, image_file))
 
 if __name__ == "__main__":   
     args = _parse_args()
@@ -966,20 +1011,13 @@ if __name__ == "__main__":
 
     lepton = Lepton(args.port, args.cmap, args.scale_factor)
     if not args.record:
-        print("Streaming...")
         res = lepton.start_stream(fps=args.fps, detect_fronts=args.detect, 
                             multiframe=args.multiframe, equalize=args.equalize)
-        if res >= 0: 
-            print("Stream done.")
         
     else:
-        print("Recording...")
         res = lepton.start_record(fps=args.fps, detect_fronts=args.detect,
                             multiframe=args.multiframe, equalize=args.equalize)
         if res >= 0:
-            print('Record done.')
             writer = Videowriter()
-            print('Writing video...')
             writer.make_video(rec_name=args.name)
-            print('Writing done.')
             
