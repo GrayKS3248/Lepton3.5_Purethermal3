@@ -30,7 +30,7 @@ def main():
             data = client.recv_msgs()
             if data == NULL: break
             if data == EOT: break
-            
+        
             # Decompress and format frame data
             t_mK = copy(data[2])
             t_mK = np.frombuffer(zlib.decompress(t_mK), dtype=np.uint16)

@@ -16,11 +16,11 @@ sys.path.pop(-1)
 
 # Global camera constants
 CAMERA_PORT = 0
-CMAP = 'black_hot'
+CMAP = 'ironbow'
 SCALE_FACTOR = 3
 RECORD = False
 FPS = None
-DETECT = True
+DETECT = False
 MULTIFRAME = True
 EQUALIZE = False
 

@@ -53,8 +53,10 @@ class Host:
     
     def bind(self, port=8080):
         hostname = socket.gethostname()
+        print('Binding host socket... ', end='', flush=True)
         self.hostsocket.bind((hostname, port))
-        print('{} bound to port {}.'.format(hostname, port), flush=True)
+        msg = '\"{}\" bound to port {}.'.format(hostname, port)
+        print(ESC.okcyan(msg), flush=True)
     
     def connect(self, port=8080, timeout=10.0, timeout_func=None):
         self.hostsocket.listen(1)
@@ -71,15 +73,24 @@ class Host:
                 return True
             
             except TimeoutError:
-                if timeout_func is None or not timeout_func():
+                if timeout_func is None:
+                    self.clientsocket = None
                     msg = "{}Timed out while attempting to connect.{}"
                     print(msg.format(ESC.WARNING, ESC.ENDC), flush=True)
                     return False
+            
+                elif not timeout_func():
+                    self.clientsocket = None
+                    msg = "{}() expired while attempting to connect."
+                    msg = msg.format(timeout_func.__name__)
+                    print(ESC.warning(msg), flush=True)
+                    return False
+                
                 continue
             
             except BaseException as e:
                 msg = ("{}Connection failed due to an unknown exception.{}")
-                print(msg.format(ESC.WARNING, ESC.ENDC))
+                print(msg.format(ESC.WARNING, ESC.ENDC), flush=True)
                 print_exception(e, self.connect)
                 return False
     
@@ -89,6 +100,7 @@ class Host:
         reconnected = self.connect(timeout=10, timeout_func=None)
         if reconnected:
             return self.send_msgs(msgs)
+        self.clientsocket = None
         msg = ("{}MESSAGE FAILED TO SEND: "
                "Connection broken while sending and "
                "reestablishment failed.{}").format(ESC.FAIL, ESC.ENDC)
@@ -179,6 +191,7 @@ class Host:
             self.clientsocket.shutdown(socket.SHUT_RDWR)
             self.clientsocket.close()
             print("{}Disconnected.{}".format(ESC.OKCYAN, ESC.ENDC), flush=True)
+            self.clientsocket = None
         
         print("Closing host socket... ", end='', flush=True)
         self.hostsocket.close()
@@ -207,13 +220,13 @@ class Client:
         except ConnectionRefusedError:
             msg = ("{}No connection could be made because the target "
                    "machine actively refused it.{}")
-            print(msg.format(ESC.WARNING, ESC.ENDC))
+            print(msg.format(ESC.WARNING, ESC.ENDC), flush=True)
             self.connected = False
             return False
         
         except BaseException as e:
             msg = ("{}Connection failed due to an unknown exception.{}")
-            print(msg.format(ESC.WARNING, ESC.ENDC))
+            print(msg.format(ESC.WARNING, ESC.ENDC), flush=True)
             print_exception(e, self.connect)
             return False
         

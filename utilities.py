@@ -3,12 +3,13 @@ from dataclasses import dataclass
 import textwrap
 import traceback
 import os
+import time
 os.system("") #For escape characters to work
 
 
 def print_exception(e, function):
-    msg = '\n'.join(textwrap.wrap(str(e), 80))
-    bars = ''.join(['-']*80)
+    msg = '\n'.join(textwrap.wrap(str(e), 60))
+    bars = ''.join(['#']*60)
     s = ("{}{}{}\n".format(ESC.FAIL,bars,ESC.ENDC),
          "{}{}{}\n".format(ESC.FAIL,type(e).__name__,ESC.ENDC),
          "In function: ",
@@ -16,9 +17,10 @@ def print_exception(e, function):
          "{}{}{}\n".format(ESC.WARNING,  msg, ESC.ENDC),
          "{}{}{}".format(ESC.FAIL,bars,ESC.ENDC),)
     
-    print("\n{}{}{}".format(ESC.FAIL, bars, ESC.ENDC))
+    print("\n{}{}{}".format(ESC.FAIL, bars, ESC.ENDC), flush=True)
     traceback.print_exc()
-    print(''.join(s))
+    print(''.join(s), flush=True)
+    print("",flush=True)
 
 def safe_run(function, stop_function=None, args=(), stop_args=()):
     try: 
@@ -41,4 +43,37 @@ class ESC:
     ENDC: str = '\033[0m'
     BOLD: str = '\033[1m'
     UNDERLINE: str = '\033[4m'
+    
+    def header(msg):
+        self = ESC()
+        return "{}{}{}".format(self.HEADER,msg,self.ENDC)
+    
+    def okblue(msg):
+        self = ESC()
+        return "{}{}{}".format(self.OKBLUE,msg,self.ENDC)
+    
+    def okcyan(msg):
+        self = ESC()
+        return "{}{}{}".format(self.OKCYAN,msg,self.ENDC)
+    
+    def okgreen(msg):
+        self = ESC()
+        return "{}{}{}".format(self.OKGREEN,msg,self.ENDC)
+    
+    def warning(msg):
+        self = ESC()
+        return "{}{}{}".format(self.WARNING,msg,self.ENDC)
+    
+    def fail(msg):
+        self = ESC()
+        return "{}{}{}".format(self.FAIL,msg,self.ENDC)
+
+    def bold(msg):
+        self = ESC()
+        return "{}{}{}".format(self.BOLD,msg,self.ENDC)
+    
+    def underline(msg):
+        self = ESC()
+        return "{}{}{}".format(self.UNDERLINE,msg,self.ENDC)
+        
     

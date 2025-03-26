@@ -2,6 +2,7 @@
 import numpy as np
 import cv2
 
+
 class Detector():
     def __init__(self, T0=0.0, a0=0.0, Hr=3.50e5, Cp=1600.0):
         """
@@ -125,17 +126,17 @@ class Detector():
         if len(temperatures) == 1:
             front_mask = np.logical_and(t_mask, g_mask)
             return front_mask
-        
+
         # Calculate the time derivative of the blurred temperature sequence
         # based on 3 step finite difference
-        elif len(temperatures) == 2:
-            bt_m1 = cv2.GaussianBlur(temperatures[0], size, 0)
-            bdt = -1.0*bt_m1 + 1.0*bt
-        elif len(temperatures) >= 3:
-            bt_m2 = cv2.GaussianBlur(temperatures[-3], size, 0)
-            bt_m1 = cv2.GaussianBlur(temperatures[-2], size, 0)
-            bdt = 0.5*bt_m2 - 2.0*bt_m1 + 1.5*bt
-        
+        bts = []
+        for i in range(len(temperatures)-1):
+            bts.append(cv2.GaussianBlur(temperatures[i],size,0))
+        bts.append(bt)
+        bdt = 0
+        for i in range(len(bts)-1):
+            bdt += bts[i+1]-bts[i]
+            
         # Isolate regions that got hotter. The front won't get colder.
         bdt[bdt<0.0]=0.0
         
@@ -159,7 +160,7 @@ class Detector():
             
         # Get the candidate front mask based on only delta temperature
         dt_lab = dt_lab.reshape((l,w))
-        dt_mask = dt_lab.reshape((l,w))==sort_dt_cen[1,1]
+        dt_mask = dt_lab==sort_dt_cen[1,1]
         
         # The front mask is the intersection of all masks
         front_mask = np.logical_and(t_mask, g_mask)

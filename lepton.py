@@ -52,6 +52,9 @@ def _parse_args():
                         action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument('-f', "--fps", help="target FPS of camera", 
                         type=int, default=None)
+    parser.add_argument('-inj', "--inject", 
+                        help="overlay video of FP on raw thermal data", 
+                        action=argparse.BooleanOptionalAction, default=False)
 
     args = parser.parse_args()
     return args
@@ -72,11 +75,11 @@ def decode_recording_data(dirpath='temp', telemetry_file='telem.json',
         timestamps_ms=[t['Uptime (ms)'] for t in telems]
     
     with open(os.path.join(dirpath, temperature_file), 'rb') as f:
-        t_mK = _read_DELIMed(f, 'rb')
-    if t_mK == None:
+        t_cK = _read_DELIMed(f, 'rb')
+    if t_cK == None:
         temperatures_C = None
     else:
-        temperatures_C = [0.01*_decode_bytes(t)-273.15 for t in t_mK]
+        temperatures_C = [0.01*_decode_bytes(t)-273.15 for t in t_cK]
     
     with open(os.path.join(dirpath, mask_file), 'rb') as f:
         masks = _read_DELIMed(f, 'rb')
@@ -128,13 +131,22 @@ class BufferLengthException(Exception):
 
 
 class Capture():
-    def __init__(self, port, target_fps):
+    def __init__(self, port, target_fps, inject):
         self.PORT = port
         self.IMAGE_SHP = (160, 120)
         try:
             self.TARGET_DT = 1.0 / target_fps
         except:
             self.TARGET_DT = None
+        
+        self.FLAG_INJ = inject
+        parent = os.path.dirname(os.path.realpath(__file__))
+        self.INJ_DIR = os.path.join(parent, r'media\FP_video')
+        self.ING_FRMS = sorted(os.listdir(self.INJ_DIR))
+        self.ING_FRMS = [cv2.imread(os.path.join(self.INJ_DIR, f))[:,:,0] 
+                         for f in self.ING_FRMS if f.endswith('.png')]
+        self.INJ_LEN = len(self.ING_FRMS)
+        self.inj_n = 0
             
         self.prev_frame_time = self._time()
         
@@ -161,7 +173,48 @@ class Capture():
                 if (self._time()-self.prev_frame_time)>=self.TARGET_DT: return
         except:
             return
-        
+    
+    def _inject(self, img):
+        inj_img = -1*np.ones((160,122))
+        foreground = self.ING_FRMS[self.inj_n].astype(np.int16)[130:-27,43:-60]
+        foreground = cv2.resize(foreground, (55, 160))
+        inj_img[:,33:-34] = foreground
+        inj_img = np.flip(inj_img.T,axis=1)
+        theta = 0.05
+        tx = 33.
+        ty = 0.
+        sx = 0.
+        sy = -0.22
+        p1 = -0.0001
+        p2 = -0.003
+        sf = -0.28
+        Hs = np.array([[1.+sf, 0.,    0.],
+                       [0.,    1.+sf, 0.],
+                       [0.,    0.,    1.]])
+        He = np.array([[np.cos(theta), -np.sin(theta), tx],
+                       [np.sin(theta),  np.cos(theta), ty],
+                       [0.,             0.,            1.]])
+        Ha = np.array([[1., sy, 0.],
+                       [sx, 1., 0.],
+                       [0., 0., 1.]])
+        Hp = np.array([[1., 0., 0.],
+                       [0., 1., 0.],
+                       [p1, p2, 1.]])
+        H = Hs@He@Ha@Hp
+        inj_img = cv2.warpPerspective(inj_img, H, inj_img.T.shape,
+                                      borderMode=cv2.BORDER_CONSTANT,
+                                      borderValue=-1)
+        inj_mask = inj_img < 0
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3))
+        inj_mask = cv2.dilate(inj_mask.astype(np.uint8), kernel, iterations=4)
+        inj_mask = np.logical_not(inj_mask)
+        inj_mask = inj_mask.astype(bool)
+        inj_img = (inj_img.astype(float)/255.) * 145.0 + 20.0
+        inj_img = np.round(100*(inj_img+273.15)).astype(np.uint16)
+        img[inj_mask] = inj_img[inj_mask]
+        self.inj_n = (self.inj_n + 1) % self.INJ_LEN
+        return img
+    
     def _decode_data(self, raw_data):
         temp_C = raw_data[:-2] * 0.01 - 273.15
         
@@ -273,6 +326,9 @@ class Capture():
             msg = msg.format(shp, self.IMAGE_SHP)
             raise ImageShapeException(msg, payload=(shp, self.IMAGE_SHP))
         
+        if self.FLAG_INJ:
+            im = self._inject(im)
+        
         if res:
             return self._decode_data(im)
         else:
@@ -282,11 +338,12 @@ class Capture():
 
 
 class Lepton():
-    def __init__(self, camera_port, cmap, scale_factor):
+    def __init__(self, camera_port, cmap, scale_factor, inject):
         self.PORT = camera_port
         self.CMAP = Cmaps[cmap]
         self.SHOW_SCALE = scale_factor
-        self.BUFFER_SIZE = 3
+        self.INJECT = inject
+        self.BUFFER_SIZE = 5
         self.WINDOW_NAME = 'Lepton 3.5 on Purethermal 3'
         self.LOCK = Lock()
         
@@ -620,25 +677,34 @@ class Lepton():
                 self.flag_streaming = False
 
     def _estop_stream(self):
-        print("Emergency stopping stream... ", end="", flush=True)
+        msg = "Emergency stopping stream... "
+        print(ESC.fail(msg), end="", flush=True)
         self.flag_emergency_stop = True
         self.flag_streaming = False
         cv2.destroyAllWindows()
         print(ESC.OKCYAN+"Stopped."+ESC.ENDC, flush=True)
 
     def _stream(self, fps, detect_fronts, multiframe, equalize):
-        with Capture(self.PORT, fps) as self.cap:
+        with Capture(self.PORT, fps, self.INJECT) as self.cap:
             if self.flag_emergency_stop:
                 self._estop_stream()
+                time.sleep(1.0) # Wait for other tasks out of thread
+                msg = "Stream emergency stopped before starting."
+                print(ESC.fail(msg), flush=True)
                 return
             
             self.flag_streaming = True
             cv2.namedWindow(self.WINDOW_NAME, cv2.WINDOW_AUTOSIZE) 
             cv2.setMouseCallback(self.WINDOW_NAME, self._mouse_callback)
-            print("Stream started... ", flush=True)
+            print(ESC.header("Stream started."), flush=True)
+            print(ESC.header(''.join(['-']*60)), flush=True)
             while self.flag_streaming:
                 if self.flag_emergency_stop:
                     self._estop_stream()
+                    time.sleep(1.0) # Wait for other tasks out of thread
+                    print(ESC.header(''.join(['-']*60)), flush=True)
+                    print(ESC.header("Stream ended in emergency stop."), 
+                          flush=True)
                     return
                 
                 temperature_C, telemetry = self.cap.read()
@@ -655,7 +721,9 @@ class Lepton():
                 self._keypress_callback()
                 
             cv2.destroyAllWindows()
-        print("{}Stream ended.{}".format(ESC.OKCYAN, ESC.ENDC), flush=True)
+        time.sleep(1.0) # Wait for other tasks out of thread
+        print(ESC.header(''.join(['-']*60)), flush=True)
+        print(ESC.header("Stream ended normally."), flush=True)
     
     def _buf_len(self):
         l1 = len(self.temperature_C_buffer)
@@ -696,11 +764,11 @@ class Lepton():
         image = frame_data[2]
         mask = frame_data[3]
         
-        temperature_mK = np.round(100.*(temperature_C+273.15))
-        temperature_mK = temperature_mK.astype(np.uint16)
+        temperature_cK = np.round(100.*(temperature_C+273.15))
+        temperature_cK = temperature_cK.astype(np.uint16)
         encode_param = [int(cv2.IMWRITE_TIFF_COMPRESSION), 
                         cv2.IMWRITE_TIFF_COMPRESSION_LZW]
-        T_img = cv2.imencode('.tiff', temperature_mK, encode_param)[1]
+        T_img = cv2.imencode('.tiff', temperature_cK, encode_param)[1]
         T_img = T_img.tobytes()
         files[0].write(T_img)
         files[0].write(b'DELIM')
@@ -719,7 +787,8 @@ class Lepton():
     
     def _estop_record(self):
         self._estop_stream()
-        print("Emergency stopping record... ", end="", flush=True)
+        msg = "Emergency stopping record... "
+        print(ESC.fail(msg), end="", flush=True)
         self.flag_emergency_stop = True
         self.flag_recording = False
         print(ESC.OKCYAN+"Stopped."+ESC.ENDC, flush=True)
@@ -730,13 +799,16 @@ class Lepton():
         fnames = ['temperature.dat', 'telem.json', 'image.dat', 'mask.dat']
         typ = ['wb', 'w', 'wb', 'wb']
         
-        with (Capture(self.PORT, fps) as self.cap,
+        with (Capture(self.PORT, fps, self.INJECT) as self.cap,
               open(os.path.join(dirname, fnames[0]), typ[0]) as T_file,
               open(os.path.join(dirname, fnames[1]), typ[1]) as t_file,
               open(os.path.join(dirname, fnames[2]), typ[2]) as i_file,
               open(os.path.join(dirname, fnames[3]), typ[3]) as m_file,):
             if self.flag_emergency_stop:
                 self._estop_record()
+                time.sleep(1.0) # Wait for other tasks out of thread
+                msg = "Recording emergency stopped before starting."
+                print(ESC.fail(msg), flush=True)
                 return
             
             self.flag_streaming = True
@@ -744,10 +816,15 @@ class Lepton():
             cv2.namedWindow(self.WINDOW_NAME, cv2.WINDOW_AUTOSIZE) 
             cv2.setMouseCallback(self.WINDOW_NAME, self._mouse_callback)
             files = (T_file, t_file, i_file, m_file, )
-            print("Recording started... ", flush=True)
+            print(ESC.header("Recording started."), flush=True)
+            print(ESC.header(''.join(['-']*60)), flush=True)
             while self.flag_streaming:
                 if self.flag_emergency_stop:
                     self._estop_record()
+                    time.sleep(1.0) # Wait for other tasks out of thread
+                    print(ESC.header(''.join(['-']*60)), flush=True)
+                    print(ESC.header("Recording ended in emergency stop."),
+                          flush=True)
                     return
                 
                 temperature_C, telemetry = self.cap.read()
@@ -775,23 +852,43 @@ class Lepton():
                 self._write_frame(frame_data, files)
             
         self.recording=False    
-        print("{}Recording ended.{}".format(ESC.OKCYAN, ESC.ENDC), flush=True)
-    
+        time.sleep(1.0) # Wait for other tasks out of thread
+        print(ESC.header(''.join(['-']*60)), flush=True)
+        print(ESC.header("Recording ended normally."), flush=True)
+
     def emergency_stop(self):
         if not self.flag_emergency_stop:
             self.flag_emergency_stop = True
             msg="{}EMERGENCY STOP COMMAND RECEIVED{}"
             print(msg.format(ESC.FAIL, ESC.ENDC), flush=True)        
 
+    def stop(self):
+        with self.LOCK:
+            self.flag_streaming = False
+
     def start_stream(self, fps=None, detect_fronts=False, multiframe=True, 
                      equalize=False):
-        return safe_run(self._stream, self._estop_stream,
-                        args=(fps, detect_fronts, multiframe, equalize, ))     
+        res = safe_run(self._stream, self._estop_stream,
+                       args=(fps, detect_fronts, multiframe, equalize, ))   
+        if res < 0:
+            time.sleep(1.0) # Wait for other tasks out of thread
+            print(ESC.header(''.join(['-']*60)), flush=True)
+            msg = "Streaming ended in emergency stop due to exception."
+            print(ESC.header(msg),flush=True)
+            
+        return res
 
     def start_record(self, fps=None, detect_fronts=False, multiframe=True, 
                      equalize=False):
-        return safe_run(self._record, self._estop_record, 
-                        args=(fps, detect_fronts, multiframe, equalize))
+        res = safe_run(self._record, self._estop_record, 
+                       args=(fps, detect_fronts, multiframe, equalize))
+        if res < 0:
+            time.sleep(1.0) # Wait for other tasks out of thread
+            print(ESC.header(''.join(['-']*60)), flush=True)
+            msg = "Recording ended in emergency stop due to exception."
+            print(ESC.header(msg),flush=True)
+            
+        return res
     
     def _wait_until(self, condition, timeout_ms, dt_ms):
         epoch_s = time.time()
@@ -815,15 +912,17 @@ class Lepton():
                                                 timeout_ms, dt_ms))   
     
     def is_streaming(self):
-        return copy(self.flag_streaming)
+        with self.LOCK:
+            return copy(self.flag_streaming)
     
     def is_recording(self):
-        return copy(self.flag_recording)
+        with self.LOCK:
+            return copy(self.flag_recording)
     
     def _frame_data_to_bytes(self, frame_data):
         frame_num = frame_data[0]
         time_stamp = frame_data[1]
-        temperature_mK = frame_data[2]
+        temperature_cK = frame_data[2]
         mask = frame_data[3]
         
         if frame_num is None:
@@ -836,11 +935,11 @@ class Lepton():
         else:
             t_data = np.uint64(time_stamp).tobytes()
         
-        if temperature_mK is None:
+        if temperature_cK is None:
             T_data = b''
         else:
-            T_data = np.insert(temperature_mK.flatten(),0,
-                               temperature_mK.shape).tobytes()
+            T_data = np.insert(temperature_cK.flatten(),0,
+                               temperature_cK.shape).tobytes()
             T_data = zlib.compress(T_data)
         
         if mask is None: 
@@ -864,10 +963,10 @@ class Lepton():
             time = round(copy(self.telemetry_buffer[-1]['Uptime (ms)'])*.001,3)
             if not focused_ok:
                 temperature_C = copy(self.temperature_C_buffer[-1])
-                temperature_mK = np.round(100*(temperature_C+273.15))
-                temperature_mK = temperature_mK.astype(np.uint16)
+                temperature_cK = np.round(100*(temperature_C+273.15))
+                temperature_cK = temperature_cK.astype(np.uint16)
                 mask = copy(self.mask_buffer[-1]).astype(np.uint16)
-                return (frame_number, time, temperature_mK, mask, )
+                return (frame_number, time, temperature_cK, mask, )
             
             temperature_C = self._warped_element(self.temperature_C_buffer, 
                                                  return_buffer=False)
@@ -875,21 +974,21 @@ class Lepton():
                                         return_buffer=False)
             
             if not self.flag_focus_box or self.homography is None:
-                temperature_mK = np.round(100*(temperature_C+273.15))
-                temperature_mK = temperature_mK.astype(np.uint16)
+                temperature_cK = np.round(100*(temperature_C+273.15))
+                temperature_cK = temperature_cK.astype(np.uint16)
                 if not mask is None:
                     mask = (mask >= 0.25).astype(np.uint16)
-                return (frame_number, time, temperature_mK, mask, )
+                return (frame_number, time, temperature_cK, mask, )
             
             shp=(int(np.round(temperature_C.shape[1]/self.SHOW_SCALE)),
                  int(np.round(temperature_C.shape[0]/self.SHOW_SCALE)))
             temperature_C = cv2.resize(temperature_C, shp)
-            temperature_mK = np.round(100*(temperature_C+273.15))
-            temperature_mK = temperature_mK.astype(np.uint16)
+            temperature_cK = np.round(100*(temperature_C+273.15))
+            temperature_cK = temperature_cK.astype(np.uint16)
             if not mask is None:
                 mask = cv2.resize(mask, shp)
                 mask = (mask >= 0.25).astype(np.uint16)
-            return (frame_number, time, temperature_mK, mask, )
+            return (frame_number, time, temperature_cK, mask, )
     
     def get_frame_data(self, focused_ok=False, as_bytes=False):
         frame_data = self._get_frame_data(focused_ok)
@@ -950,9 +1049,9 @@ class Videowriter():
                  "In function: ",
                  "{}{}(){}\n".format(ESC.OKBLUE, fnc_name, ESC.ENDC),
                  "{}{}{}\n".format(ESC.WARNING,  msg, ESC.ENDC),)
-            print(''.join(s))
+            print(''.join(s), flush=True)
             rec_name = input('Please enter a different name: ')
-            print("{}{}{}".format(ESC.FAIL,bars,ESC.ENDC))
+            print("{}{}{}".format(ESC.FAIL,bars,ESC.ENDC), flush=True)
             return self._get_valid_name(rec_name)
 
     def _make_video(self, rec_name, dirpath, telemetry_file, image_file):
@@ -1010,9 +1109,9 @@ if __name__ == "__main__":
     
     if not args.fps is None and args.fps < 5:
         wstr="Target FPS set below 5 can result in erroneous video rendering."
-        print(ESC.WARNING+'WARNING: '+wstr+ESC.ENDC)
+        print(ESC.WARNING+'WARNING: '+wstr+ESC.ENDC, flush=True)
 
-    lepton = Lepton(args.port, args.cmap, args.scale_factor)
+    lepton = Lepton(args.port, args.cmap, args.scale_factor, args.inject)
     if not args.record:
         res = lepton.start_stream(fps=args.fps, detect_fronts=args.detect, 
                             multiframe=args.multiframe, equalize=args.equalize)
