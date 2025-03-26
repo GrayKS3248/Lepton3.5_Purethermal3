@@ -32,10 +32,10 @@ def main():
             if data == EOT: break
         
             # Decompress and format frame data
-            t_mK = copy(data[2])
-            t_mK = np.frombuffer(zlib.decompress(t_mK), dtype=np.uint16)
-            t_mK = t_mK[2:].reshape(t_mK[:2])
-            t_C = 0.01*t_mK-273.15
+            t_cK = copy(data[2])
+            t_cK = np.frombuffer(zlib.decompress(t_cK), dtype=np.uint16)
+            t_cK = t_cK[2:].reshape(t_cK[:2])
+            t_C = 0.01*t_cK-273.15
             
             mask = copy(data[3])
             if mask != b'':

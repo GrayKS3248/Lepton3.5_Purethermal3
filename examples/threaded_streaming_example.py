@@ -14,16 +14,16 @@ sys.path.pop(-1)
 CAMERA_PORT = 0
 CMAP = 'black_hot'
 SCALE_FACTOR = 3
-RECORD = True
+RECORD = False
 FPS = None
-DETECT = True
+DETECT = False
 MULTIFRAME = True
 EQUALIZE = False
 
 
 def initialize():
     # Initialize lepton camera
-    lepton = Lepton(CAMERA_PORT, CMAP, SCALE_FACTOR)
+    lepton = Lepton(CAMERA_PORT, CMAP, SCALE_FACTOR, False)
     
     # Begin streaming in a thread
     args = (FPS, DETECT, MULTIFRAME, EQUALIZE)
