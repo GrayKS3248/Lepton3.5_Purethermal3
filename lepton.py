@@ -59,7 +59,7 @@ def _parse_args():
     args = parser.parse_args()
     return args
 
-def decode_recording_data(dirpath='temp', telemetry_file='telem.json',
+def decode_recording_data(dirpath='rec_data', telemetry_file='telem.json',
                           temperature_file='temperature.dat',
                           mask_file='mask.dat'):
     print("Decoding raw data... ", end='', flush=True)
@@ -131,7 +131,7 @@ class BufferLengthException(Exception):
 
 
 class Capture():
-    def __init__(self, port, target_fps, inject):
+    def __init__(self, port, target_fps, overlay):
         self.PORT = port
         self.IMAGE_SHP = (160, 120)
         try:
@@ -139,7 +139,7 @@ class Capture():
         except:
             self.TARGET_DT = None
         
-        self.FLAG_INJ = inject
+        self.FLAG_INJ = overlay
         parent = os.path.dirname(os.path.realpath(__file__))
         self.INJ_DIR = os.path.join(parent, r'media\FP_video')
         self.ING_FRMS = sorted(os.listdir(self.INJ_DIR))
@@ -809,7 +809,7 @@ class Lepton():
         print(ESC.OKCYAN+"Stopped."+ESC.ENDC, flush=True)
     
     def _record(self, fps, detect_fronts, multiframe, equalize):
-        dirname = 'temp'
+        dirname = 'rec_data'
         os.makedirs(dirname, exist_ok=True)
         fnames = ['temperature.dat', 'telem.json', 'image.dat', 'mask.dat']
         typ = ['wb', 'w', 'wb', 'wb']
@@ -1114,7 +1114,7 @@ class Videowriter():
                 prev_time = copy(time)
         print("{}Done.{}".format(ESC.OKCYAN, ESC.ENDC), flush=True)
 
-    def make_video(self, rec_name='recording', dirpath='temp', 
+    def make_video(self, rec_name='recording', dirpath='rec_data', 
                    telemetry_file='telem.json', image_file='image.dat'):
         return safe_run(self._make_video, 
                         args=(rec_name, dirpath, telemetry_file, image_file))

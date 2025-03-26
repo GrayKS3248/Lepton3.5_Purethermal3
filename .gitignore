@@ -1,6 +1,7 @@
 cache/*
 __pycache__/*
 temp/*
+rec_data/*
 
 # Pickle
 *.p
