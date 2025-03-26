@@ -1134,7 +1134,6 @@ if __name__ == "__main__":
     else:
         res = lepton.start_record(fps=args.fps, detect_fronts=args.detect,
                             multiframe=args.multiframe, equalize=args.equalize)
-        if res >= 0:
-            writer = Videowriter()
-            writer.make_video(rec_name=args.name)
+        writer = Videowriter()
+        writer.make_video(rec_name=args.name)
             
