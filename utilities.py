@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import textwrap
 import traceback
 import os
-import time
+import sys
 os.system("") #For escape characters to work
 
 
@@ -18,7 +18,12 @@ def print_exception(e, function):
          "{}{}{}".format(ESC.FAIL,bars,ESC.ENDC),)
     
     print("\n{}{}{}".format(ESC.FAIL, bars, ESC.ENDC), flush=True)
-    traceback.print_exc()
+    _, _, tb = sys.exc_info()
+    stack_summary = traceback.extract_tb(tb)
+    msgs = traceback.format_list(stack_summary)
+    print("Traceback (most recent call last):", flush=True)
+    for m in msgs:
+        print(m,end='',flush=True)
     print(''.join(s), flush=True)
     print("",flush=True)
 

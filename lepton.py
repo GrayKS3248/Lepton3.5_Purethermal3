@@ -52,8 +52,8 @@ def _parse_args():
                         action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument('-f', "--fps", help="target FPS of camera", 
                         type=int, default=None)
-    parser.add_argument('-inj', "--inject", 
-                        help="overlay video of FP on raw thermal data", 
+    parser.add_argument('-o', "--overlay", 
+                        help=argparse.SUPPRESS, 
                         action=argparse.BooleanOptionalAction, default=False)
 
     args = parser.parse_args()
@@ -174,7 +174,7 @@ class Capture():
         except:
             return
     
-    def _inject(self, img):
+    def _overlay(self, img):
         inj_img = -1*np.ones((160,122))
         foreground = self.ING_FRMS[self.inj_n].astype(np.int16)[130:-27,43:-60]
         foreground = cv2.resize(foreground, (55, 160))
@@ -327,7 +327,7 @@ class Capture():
             raise ImageShapeException(msg, payload=(shp, self.IMAGE_SHP))
         
         if self.FLAG_INJ:
-            im = self._inject(im)
+            im = self._overlay(im)
         
         if res:
             return self._decode_data(im)
@@ -361,6 +361,7 @@ class Lepton():
         self.flag_emergency_stop = False
         self.flag_focus_box = False
         self.flag_modding_AR = True
+        self.flag_modding_fast = False
         
         self.focus_box_AR = 1.33333333
         self.focus_box_size = 0.50
@@ -374,20 +375,27 @@ class Lepton():
     def _mouse_callback(self, event, x, y, flags, param):
         if not self.flag_focus_box: return
         
+        if event == cv2.EVENT_MBUTTONDOWN and self.homography is None:
+            self.flag_modding_fast = not self.flag_modding_fast
+        
         if event == cv2.EVENT_MOUSEWHEEL and self.homography is None:
+            if self.flag_modding_fast:
+                rate = 0.1
+            else:
+                rate = 0.01
             if flags > 0:
                 if self.flag_modding_AR:
-                    self.focus_box_AR += 0.01
+                    self.focus_box_AR += rate
                 else:
-                    self.focus_box_size += 0.01
+                    self.focus_box_size += rate
             else:
                 if self.flag_modding_AR:
-                    self.focus_box_AR -= 0.01
+                    self.focus_box_AR -= rate
                 else:
-                    self.focus_box_size -= 0.01
-            self.focus_box_size = np.clip(self.focus_box_size, 0.0, 1.0)
-            self.focus_box_AR = np.clip(self.focus_box_AR, 0.0, 
-                                        1.333333333/self.focus_box_size)
+                    self.focus_box_size -= rate
+            self.focus_box_size = np.clip(self.focus_box_size, 0.01, 1.0)
+            self.focus_box_AR = np.clip(self.focus_box_AR, 0.01, 
+                                        min(4./(3.*self.focus_box_size), 9.99))
 
         if event == cv2.EVENT_RBUTTONDOWN and self.homography is None:
             self.flag_modding_AR = not self.flag_modding_AR
@@ -466,7 +474,11 @@ class Lepton():
         F = median_hist[median_hist>0]
         local_maxizers = find_peaks(F)[0]
         global_maximizer = np.argmax(F)
-        T = np.median(F[local_maxizers[local_maxizers>=global_maximizer]])
+        F_prime = F[local_maxizers[local_maxizers>=global_maximizer]]
+        if len(F_prime) == 0:
+            return norm
+        else:
+            T = np.median(F[local_maxizers[local_maxizers>=global_maximizer]])
         P[P>T] = T
         FT = np.cumsum(P)
         DT = np.floor(255*FT/FT[-1]).astype(np.uint8)
@@ -595,7 +607,10 @@ class Lepton():
         for i in range(self.BUFFER_SIZE):
             telemetry = self.telemetry_buffer[i-self.BUFFER_SIZE]
             frame_times.append(telemetry['Uptime (ms)'])
-        delta = np.mean(np.diff(frame_times))*0.001
+        if len(frame_times) <= 1:
+            delta = 0.0
+        else:
+            delta = np.mean(np.diff(frame_times))*0.001
         if delta <= 0.0: return 'FPS: ---'
         return 'FPS: {:.2f}'.format(1.0/delta)
             
@@ -1111,7 +1126,7 @@ if __name__ == "__main__":
         wstr="Target FPS set below 5 can result in erroneous video rendering."
         print(ESC.WARNING+'WARNING: '+wstr+ESC.ENDC, flush=True)
 
-    lepton = Lepton(args.port, args.cmap, args.scale_factor, args.inject)
+    lepton = Lepton(args.port, args.cmap, args.scale_factor, args.overlay)
     if not args.record:
         res = lepton.start_stream(fps=args.fps, detect_fronts=args.detect, 
                             multiframe=args.multiframe, equalize=args.equalize)
