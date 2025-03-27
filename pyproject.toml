@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "lepton-pt"
+dynamic = ["version"]
+description = "Runs a FLIR Lepton 3.5 on a Purethermal3 in Windows 10."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE.txt" }
+keywords = [
+    "flir",
+    "lepton",
+    "groupgets",
+    "purethermal",
+    "windows",
+    "thermal",
+    "camera",
+]
+authors = [{ name = "Grayson Schaer", email = "gschaer2@illinois.edu" }]
+maintainers = [{ name = "Grayson Schaer", email = "gschaer2@illinois.edu" }]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Intended Audience :: End Users/Desktop",
+  "Intended Audience :: Science/Research",
+  "Natural Language :: English",
+  "Operating System :: Microsoft :: Windows :: Windows 10",
+  "Topic :: Scientific/Engineering :: Image Processing",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3 :: Only",
+]
+dependencies = [
+  "numpy",
+  "matplotlib",
+  "scipy",
+  "opencv-python",
+  "pyav",
+]
+
+
+[project.urls]
+"Homepage" = "https://github.com/GrayKS3248/Lepton3.5_Purethermal3/"
+"Bug Reports" = "https://github.com/GrayKS3248/Lepton3.5_Purethermal3/issues/"
+"Source" = "https://github.com/GrayKS3248/Lepton3.5_Purethermal3/"
+
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+
+[project.scripts]
+leprun = "lepton:leprun"
+
+
+[tool.setuptools.package-data]
+"*" = ["*.png"]
