@@ -12,5 +12,5 @@ from lepton.comm import (Host, # NOQA
                          Client)
 from lepton.main import leprun # NOQA
 
-from lepton import _version
-__version__ = _version.get_versions()["version"]
+
+__version__ = '0.0.1'
