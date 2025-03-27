@@ -69,9 +69,8 @@ class Capture():
     
     def _overlay(self, img):
         inj_img = -1*np.ones((160,122))
-        foreground = self.ING_FRMS[self.inj_n].astype(np.int16)[130:-27,43:-60]
-        foreground = cv2.resize(foreground, (55, 160))
-        inj_img[:,33:-34] = foreground
+        foreground = self.ING_FRMS[self.inj_n].astype(np.int16)
+        inj_img[:,34:-35] = foreground
         inj_img = np.flip(inj_img.T,axis=1)
         theta = 0.05
         tx = 33.
