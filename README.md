@@ -16,70 +16,59 @@ Software to run a FLIR Lepton 3.5 mounted on a Groupgets Purethermal3 board runn
 
 # Installation
 
-You must first install a set of dependencies. It is reccomended that you use either [Anaconda or Miniconda](https://www.anaconda.com/download/success).
+### From Source (Reccomended)
 
-### Conda from .yml (RECOMMENDED)
+It is reccomended that you use either [Anaconda or Miniconda](https://www.anaconda.com/download/success).
 
-Open a Conda prompt.
-
-Run the command below to create a Conda environment named Lepton and automatically install all dependencies.
-
-```shell
-conda env create -f environment.yml -p PATH_TO_INSTALL
-```
-
-### Conda from Source
-
-Open a Conda prompt.
-
-Run the commands below to create a fresh conda environment named Lepton.
+Run the commands below to create a fresh conda environment named lepton.
 
 ```shell
 conda create -n lepton -y
 conda activate lepton
 ```
 
-If needed, run the following commands to add conda forge to your conda channels.
+Install pip and git in the environment.
 
 ```shell
-conda config --env --add channels conda-forge
-conda config --env --set channel_priority strict
+conda install pip git -y
 ```
 
-Finally, these commands install all external dependencies to your conda environment
+Clone the Lepton3.5_Purethermal3 repository.
+
+```git
+git clone https://github.com/GrayKS3248/Lepton3.5_Purethermal3.git
+```
+
+Navigate to the repository directory and install the package.
 
 ```shell
-conda install pip git numpy matplotlib scipy -y
-pip install opencv-python pyav
+cd Lepton3.5_Purethermal3
+pip install .
 ```
 
 # Usage
 
 ### Streaming
 
-After the Lepton is seated in the Purethermal board and connected to a device via a USB-C, open a Conda prompt.
-
-Run the following commands to activate the Lepton Conda environment and start streaming the camera.
+After the Lepton is seated in the Purethermal board and connected to a device via a USB-C,  activate the Conda environment in which this package is installed and start streaming the camera using the `leprun` command.
 
 ```shell
-conda activate Lepton
-python lepton.py
+conda activate lepton
+leprun
 ```
 
 When you are finshed streaming, press the `esc` while the viewing window is active to terminate the streaming.
 
 ### Recording
 
-After the Lepton is seated in the Purethermal board and connected to a device via a USB-C, open a Conda prompt.
-
-Run the following commands to activate the Lepton Conda environment and start recording the camera.
+After the Lepton is seated in the Purethermal board and connected to a device via a USB-C, activate the Conda environment in which this package is installed and start streaming the camera using the `leprun` command and the `-r` flag.
 
 ```shell
-conda activate Lepton
-python lepton.py -r
+conda activate lepton
+leprun -r
 ```
 
-the `-r` flag indicates that you want to record what is being streamed. All generated data is saved in a temporary folder named temp and after the recording is terminated, will be rendered into a `.avi` video.
+The `-r` flag indicates that you want to record what is being streamed. All generated data is saved in a folder named `rec_data`  in the current directory and after the recording is terminated, will be rendered into a `.avi` video also in the current directory.
 
 When you are finshed recording, press the `esc` while the viewing window is active to terminate recording. Note that it will take some time after the recording is terminated to render the captured video.
 
@@ -88,12 +77,12 @@ When you are finshed recording, press the `esc` while the viewing window is acti
 You can use the `-h` flag to explore addtional flags and functionality.
 
 ```
-python lepton.py -h
+leprun -h
 ```
 
 # Homography Transform
 
-This software supports post-processing image warping to focus on a quadrilateral region of interest (qROI). To begin, press `f` while the viewer window is active to open the focus window, shown in cyan. The aspect ratio and size of the focus window are adjusted using the mouse scroll wheel. You can switch between which parameter you are adjusting using the right mouse click. 
+This software supports post-processing image warping to focus on a quadrilateral region of interest (qROI). To begin, press `f` while the viewer window is active to open the focus window, shown in cyan. The aspect ratio and size of the focus window are adjusted using the mouse scroll wheel (the middle mouse button can be used to toggle between fast edit and slow edit). You can switch between which parameter you are adjusting using the right mouse click. 
 
 Once the focus window is set, use the left mouse button to define the four corners of the qROI, shown in magenta. The corner of the focus box to which the selected qROI corner will be transformed is shown as a magenta dot on one of the focus box corners. Once all four corners are defined, a homography transformation will be applied so the qROI occupies the focus box.
 
@@ -102,8 +91,6 @@ To reset the qROI, press `r`.
 To toggle the homography transform, press `f`.
 
 ![homography](https://github.com/GrayKS3248/Lepton3.5_Purethermal3/blob/main/media/homography_example.gif)
-
-
 
 # Common Errors
 
@@ -123,18 +110,14 @@ should reseat its socket.
    To fix, try instead running:
    
    ```shell
-   python lepton.py -p A_PORT_NUMBER_THAT_IS_NOT_0
+   leprun -p A_PORT_NUMBER_THAT_IS_NOT_0
    ```
    
    Where `A_PORT_NUMBER_THAT_IS_NOT_0` is any integer that is not `0`. Each camera device has its own unique port identifier. This code defaults to using port `0` but if you have multiple cameras, the Lepton might be at a higher port number. The `-p` flag allows a users to change the selected port.
 
 2. *The lepton is not seated properly in the Purethermal socket.*
    
-   To fix, disconnect the Purethermal from power, completely remove the Lepton from the Purethermal socket, and reinsert it. After power is restored, try again running:
-   
-   ```shell
-   python lepton.py
-   ```
+   To fix, disconnect the Purethermal from power, completely remove the Lepton from the Purethermal socket, and reinsert it. After power is restored, you can try `leprun` again.
 
 ### Failed Recording
 
