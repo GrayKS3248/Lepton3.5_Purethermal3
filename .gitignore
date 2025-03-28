@@ -2,6 +2,7 @@
 **/__pycache__/*
 **/rec_data/*
 **/build/*
+**/dist/*
 **/lepton_pt.egg-info/*
 
 # Pickle

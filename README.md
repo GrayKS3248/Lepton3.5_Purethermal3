@@ -16,7 +16,30 @@ Software to run a FLIR Lepton 3.5 mounted on a Groupgets Purethermal3 board runn
 
 # Installation
 
-### From Source (Reccomended)
+### From PyPi (Reccomended)
+
+It is reccomended that you use either [Anaconda or Miniconda](https://www.anaconda.com/download/success).
+
+Run the commands below to create a fresh conda environment named lepton.
+
+```shell
+conda create -n lepton -y
+conda activate lepton
+```
+
+Install pip in the environment.
+
+```shell
+conda install pip -y
+```
+
+Install `lepton-pt`
+
+```shell
+pip install lepton-pt
+```
+
+### From Source
 
 It is reccomended that you use either [Anaconda or Miniconda](https://www.anaconda.com/download/success).
 
