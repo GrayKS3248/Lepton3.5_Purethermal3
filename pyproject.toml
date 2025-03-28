@@ -49,13 +49,17 @@ dependencies = [
 "Source" = "https://github.com/GrayKS3248/Lepton3.5_Purethermal3/"
 
 
-[tool.setuptools.packages.find]
-where = ["src"]
-
-
 [project.scripts]
 leprun = "lepton:leprun"
 
 
 [tool.setuptools.package-data]
 "*" = ["*.png"]
+
+
+[tool.setuptools.dynamic]
+version = {attr = "lepton.__version__"}
+
+
+[tool.setuptools.packages.find]
+where = ["src"]

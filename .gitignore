@@ -1,8 +1,8 @@
-cache/*
-__pycache__/*
-rec_data/*
-build/*
-src/lepton_pt.egg-info/*
+**/cache/*
+**/__pycache__/*
+**/rec_data/*
+**/build/*
+**/lepton_pt.egg-info/*
 
 # Pickle
 *.p
