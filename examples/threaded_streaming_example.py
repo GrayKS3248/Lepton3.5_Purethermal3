@@ -1,13 +1,10 @@
 # Std modules
-import sys
 import threading
 
 # Package modules
-sys.path.append("..")
 from lepton import Lepton
 from lepton import Videowriter
 from lepton import decode_recording_data
-sys.path.pop(-1)
 
 
 # Global camera constants
@@ -41,7 +38,7 @@ def main(lepton):
         lepton.emergency_stop()
     
     # Stream the lepton data
-    while lepton.is_streaming():
+    while lepton.is_streaming:
         frame_data = lepton.get_frame_data(focused_ok=True)
         
         # These values will be None if attempt to get same frame data more than

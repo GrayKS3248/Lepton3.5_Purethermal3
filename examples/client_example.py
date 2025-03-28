@@ -1,17 +1,14 @@
 # Std modules
 import zlib
-import sys
 from copy import copy
 
 # External modules
 import numpy as np
 
 # Package modules
-sys.path.append("..")
-from oneway_socket import Client
-from oneway_socket import EOT
-from oneway_socket import NULL
-sys.path.pop(-1)
+from lepton import Client
+from lepton import EOT
+from lepton import NULL
 
 
 # Global socket constants

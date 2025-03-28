@@ -9,8 +9,10 @@ from lepton.misc import (Cmaps, # NOQA
                          print_exception,
                          safe_run,)
 from lepton.comm import (Host, # NOQA
-                         Client)
+                         Client,
+                         EOT,
+                         NULL,)
 from lepton.main import leprun # NOQA
 
 
-__version__ = '0.1.a0'
+__version__ = '0.1.a1'

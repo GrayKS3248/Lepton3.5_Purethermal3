@@ -1,5 +1,9 @@
 from lepton.comm.oneway_socket import (Host,
-                                       Client,)
+                                       Client,
+                                       NULL,
+                                       EOT,)
 
 __all__ = ["Host",
-           "Client",]
+           "Client",
+           "NULL",
+           "EOT"]

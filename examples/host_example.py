@@ -1,17 +1,14 @@
 # Std modules
-import sys
 import threading
 
 # External modules
 import numpy as np
 
 # Package modules
-sys.path.append("..")
 from lepton import Lepton
 from lepton import Videowriter
 from lepton import decode_recording_data
-from oneway_socket import Host
-sys.path.pop(-1)
+from lepton import Host
 
 
 # Global camera constants
@@ -56,7 +53,7 @@ def main(lepton):
             return
         
         # While lepton is streaming, get and send frame data
-        while lepton.is_streaming():
+        while lepton.is_streaming:
             frame_data = lepton.get_frame_data(focused_ok=True, as_bytes=True)
             if frame_data[1] == b'': continue
         
