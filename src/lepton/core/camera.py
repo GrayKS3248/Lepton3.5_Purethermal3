@@ -894,12 +894,10 @@ class Lepton():
         if as_bytes: return self._frame_data_to_bytes(frame_data)
         return frame_data
     
-    @property
     def is_streaming(self):
         with self.LOCK:
             return copy(self.flag_streaming)
     
-    @property
     def is_recording(self):
         with self.LOCK:
             return copy(self.flag_recording)

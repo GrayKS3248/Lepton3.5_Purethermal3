@@ -38,7 +38,7 @@ def main(lepton):
         lepton.emergency_stop()
     
     # Stream the lepton data
-    while lepton.is_streaming:
+    while lepton.is_streaming():
         frame_data = lepton.get_frame_data(focused_ok=True)
         
         # These values will be None if attempt to get same frame data more than

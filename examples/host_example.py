@@ -47,13 +47,13 @@ def main(lepton):
     # Create a host socket to send captured data
     with Host() as host:
         host.bind(PORT)
-        connected = host.connect(timeout_func=lepton.is_streaming)
-        if not connected:
-            lepton.emergency_stop()
+        if not host.connect(timeout_func=lepton.is_streaming):
+            if lepton.is_streaming():
+                lepton.emergency_stop()
             return
         
         # While lepton is streaming, get and send frame data
-        while lepton.is_streaming:
+        while lepton.is_streaming():
             frame_data = lepton.get_frame_data(focused_ok=True, as_bytes=True)
             if frame_data[1] == b'': continue
         
