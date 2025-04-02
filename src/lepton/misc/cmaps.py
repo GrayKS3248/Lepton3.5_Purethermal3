@@ -44,6 +44,7 @@ class Cmaps(_Subscriptable):
     IRONBOW: ClassVar[ListedColormap] = _get_cmap(_IRONBOW, 'ironbow')
     MAGMA: ClassVar[ListedColormap] = colormaps['magma']
     OUTDOOR_ALERT: ClassVar[ListedColormap] = _get_cmap(_OUTDOOR_ALERT, 'outdoor_alert')
+    PLASMA: ClassVar[ListedColormap] = colormaps['plasma']
     RAINBOW: ClassVar[ListedColormap] = _get_cmap(_RAINBOW, 'rainbow')
     RAINBOW_HC: ClassVar[ListedColormap] = _get_cmap(_RAINBOW_HC, 'rainbow_hc')
     VIRIDIS: ClassVar[ListedColormap] = colormaps['viridis']

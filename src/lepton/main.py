@@ -19,9 +19,9 @@ def _parse_args():
     parser.add_argument('-c', "--cmap", help="colormap used in viewer", 
                         default='black_hot', 
                         choices=['afmhot', 'arctic', 'black_hot', 'cividis', 
-                                 'ironbow', 'inferno', 'magma',
-                                 'outdoor_alert', 'rainbow', 'rainbow_hc',
-                                 'viridis', 'white_hot'])
+                                 'ironbow', 'inferno', 'magma','outdoor_alert',
+                                 'plasma', 'rainbow', 'rainbow_hc', 'viridis',
+                                 'white_hot'])
     parser.add_argument('-sf', "--scale-factor", 
                         help="the amount the captured image is scaled by",
                         type=int, default=3)
