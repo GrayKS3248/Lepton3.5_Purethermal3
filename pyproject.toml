@@ -54,7 +54,7 @@ leprun = "lepton:leprun"
 
 
 [tool.setuptools.package-data]
-"*" = ["*.dat"]
+"*" = ["*.cdat"]
 
 
 [tool.setuptools.dynamic]
