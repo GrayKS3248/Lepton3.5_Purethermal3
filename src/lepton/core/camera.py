@@ -31,20 +31,20 @@ class Capture():
         except:
             self.TARGET_DT = None
         
-        self.FLAG_INJ = overlay
-        if self.FLAG_INJ:
+        self.FLAG_OVERLAY = overlay
+        if self.FLAG_OVERLAY:
             parent = os.path.dirname(os.path.realpath(__file__))
-            self.INJ_DIR = os.path.join(parent, r'_media')
-            with open(os.path.join(self.INJ_DIR,'overlay.cdat'), 'rb') as f:
+            overlay_dirpath = os.path.join(parent, r'_media')
+            with open(os.path.join(overlay_dirpath,'overlay.cdat'), 'rb') as f:
                 bindat = f.read()
             decoded = zlib.decompress(bindat).split(b'DELIM')
             shape = np.frombuffer(decoded[0], dtype=np.uint8)
             decoded.pop()
             decoded.pop(0)
-            self.ING_FRMS = [np.frombuffer(d,dtype=np.uint8).reshape(shape) 
-                             for d in decoded]
-            self.INJ_LEN = len(self.ING_FRMS)
-            self.inj_n = 0
+            self.OVERLAY_FRMS = [np.frombuffer(d,dtype=np.uint8).reshape(shape) 
+                                 for d in decoded]
+            self.OVERLAY_LEN = len(self.OVERLAY_FRMS)
+            self.overlay_n = 0
             
         self.prev_frame_time = self._time()
         
@@ -73,10 +73,10 @@ class Capture():
             return
     
     def _overlay(self, img):
-        inj_img = -1*np.ones((160,122))
-        foreground = self.ING_FRMS[self.inj_n]
-        inj_img[:,34:-35] = foreground
-        inj_img = np.flip(inj_img.T,axis=1)
+        overlay_img = -1*np.ones((160,122))
+        foreground = self.OVERLAY_FRMS[self.overlay_n]
+        overlay_img[:,34:-35] = foreground
+        overlay_img = np.flip(overlay_img.T,axis=1)
         theta = 0.05
         tx = 33.
         ty = 0.
@@ -98,18 +98,19 @@ class Capture():
                        [0., 1., 0.],
                        [p1, p2, 1.]])
         H = Hs@He@Ha@Hp
-        inj_img = cv2.warpPerspective(inj_img, H, inj_img.T.shape,
+        overlay_img = cv2.warpPerspective(overlay_img, H, overlay_img.T.shape,
                                       borderMode=cv2.BORDER_CONSTANT,
                                       borderValue=-1)
-        inj_mask = inj_img < 0
+        overlay_mask = overlay_img < 0
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3))
-        inj_mask = cv2.dilate(inj_mask.astype(np.uint8), kernel, iterations=4)
-        inj_mask = np.logical_not(inj_mask)
-        inj_mask = inj_mask.astype(bool)
-        inj_img = (inj_img.astype(float)/255.) * 145.0 + 20.0
-        inj_img = np.round(100*(inj_img+273.15)).astype(np.uint16)
-        img[inj_mask] = inj_img[inj_mask]
-        self.inj_n = (self.inj_n + 1) % self.INJ_LEN
+        overlay_mask = cv2.dilate(overlay_mask.astype(np.uint8), 
+                                  kernel, iterations=4)
+        overlay_mask = np.logical_not(overlay_mask)
+        overlay_mask = overlay_mask.astype(bool)
+        overlay_img = (overlay_img.astype(float)/255.) * 145.0 + 20.0
+        overlay_img = np.round(100*(overlay_img+273.15)).astype(np.uint16)
+        img[overlay_mask] = overlay_img[overlay_mask]
+        self.overlay_n = (self.overlay_n + 1) % self.OVERLAY_LEN
         return img
     
     def _decode_data(self, raw_data):
@@ -223,7 +224,7 @@ class Capture():
             msg = msg.format(shp, self.IMAGE_SHP)
             raise ImageShapeException(msg, payload=(shp, self.IMAGE_SHP))
         
-        if self.FLAG_INJ:
+        if self.FLAG_OVERLAY:
             im = self._overlay(im)
         
         if res:
@@ -235,11 +236,11 @@ class Capture():
 
 
 class Lepton():
-    def __init__(self, camera_port, cmap, scale_factor, inject):
+    def __init__(self, camera_port, cmap, scale_factor, overlay):
         self.PORT = camera_port
         self.CMAP = Cmaps[cmap]
         self.SHOW_SCALE = scale_factor
-        self.INJECT = inject
+        self.OVERLAY = overlay
         self.BUFFER_SIZE = 5
         self.WINDOW_NAME = 'Lepton 3.5 on Purethermal 3'
         self.LOCK = Lock()
@@ -597,7 +598,7 @@ class Lepton():
         print(ESC.OKCYAN+"Stopped."+ESC.ENDC, flush=True)
 
     def _stream(self, fps, detect_fronts, multiframe, equalize):
-        with Capture(self.PORT, fps, self.INJECT) as self.cap:
+        with Capture(self.PORT, fps, self.OVERLAY) as self.cap:
             if self.flag_emergency_stop:
                 self._estop_stream()
                 time.sleep(1.0) # Wait for other tasks out of thread
@@ -711,7 +712,7 @@ class Lepton():
         fnames = ['temperature.dat', 'telem.json', 'image.dat', 'mask.dat']
         typ = ['wb', 'w', 'wb', 'wb']
         
-        with (Capture(self.PORT, fps, self.INJECT) as self.cap,
+        with (Capture(self.PORT, fps, self.OVERLAY) as self.cap,
               open(os.path.join(dirname, fnames[0]), typ[0]) as T_file,
               open(os.path.join(dirname, fnames[1]), typ[1]) as t_file,
               open(os.path.join(dirname, fnames[2]), typ[2]) as i_file,
