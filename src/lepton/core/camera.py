@@ -34,10 +34,15 @@ class Capture():
         self.FLAG_INJ = overlay
         if self.FLAG_INJ:
             parent = os.path.dirname(os.path.realpath(__file__))
-            self.INJ_DIR = os.path.join(parent, r'_media\video')
-            self.ING_FRMS = sorted(os.listdir(self.INJ_DIR))
-            self.ING_FRMS = [cv2.imread(os.path.join(self.INJ_DIR, f))[:,:,0] 
-                             for f in self.ING_FRMS if f.endswith('.png')]
+            self.INJ_DIR = os.path.join(parent, r'_media')
+            with open(os.path.join(self.INJ_DIR,'overlay.cdat'), 'rb') as f:
+                bindat = f.read()
+            decoded = zlib.decompress(bindat).split(b'DELIM')
+            shape = np.frombuffer(decoded[0], dtype=np.uint8)
+            decoded.pop()
+            decoded.pop(0)
+            self.ING_FRMS = [np.frombuffer(d,dtype=np.uint8).reshape(shape) 
+                             for d in decoded]
             self.INJ_LEN = len(self.ING_FRMS)
             self.inj_n = 0
             
@@ -69,7 +74,7 @@ class Capture():
     
     def _overlay(self, img):
         inj_img = -1*np.ones((160,122))
-        foreground = self.ING_FRMS[self.inj_n].astype(np.int16)
+        foreground = self.ING_FRMS[self.inj_n]
         inj_img[:,34:-35] = foreground
         inj_img = np.flip(inj_img.T,axis=1)
         theta = 0.05
