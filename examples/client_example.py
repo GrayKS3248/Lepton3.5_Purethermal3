@@ -1,14 +1,8 @@
-# Std modules
-import zlib
-from copy import copy
-
-# External modules
-import numpy as np
-
 # Package modules
 from lepton import Client
 from lepton import EOT
 from lepton import NULL
+from lepton import decode_frame_data
 
 
 # Global socket constants
@@ -24,20 +18,17 @@ def main():
         
         # Receive frame data until NULL or EOT sent
         while True:
-            data = client.recv_msgs()
-            if data == NULL: break
-            if data == EOT: break
+            frame_data = client.recv_msgs()
+            if frame_data == NULL: break
+            if frame_data == EOT: break
         
-            # Decompress and format frame data
-            t_cK = copy(data[2])
-            t_cK = np.frombuffer(zlib.decompress(t_cK), dtype=np.uint16)
-            t_cK = t_cK[2:].reshape(t_cK[:2])
-            t_C = 0.01*t_cK-273.15
-            
-            mask = copy(data[3])
-            if mask != b'':
-                mask = np.frombuffer(zlib.decompress(mask), dtype=np.uint16)
-                mask = mask[2:].reshape(mask[:2]).astype(bool)
+            frame_data = decode_frame_data(frame_data)
+            frame_num = tuple(frame_data[0].tolist())
+            frame_time = tuple([round(float(f)*.001,3) for f in frame_data[1]])
+            temperature = (0.01*frame_data[2].astype(float))-273.15
+            telemetry = eval(frame_data[3][0])
+            image = frame_data[4]
+            mask = frame_data[5]
             
 if __name__=="__main__":
     main()

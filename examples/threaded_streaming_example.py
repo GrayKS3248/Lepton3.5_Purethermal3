@@ -4,7 +4,6 @@ import threading
 # Package modules
 from lepton import Lepton
 from lepton import Videowriter
-from lepton import decode_recording_data
 
 
 # Global camera constants
@@ -41,12 +40,13 @@ def main(lepton):
     while lepton.is_streaming():
         frame_data = lepton.get_frame_data(focused_ok=True)
         
-        # These values will be None if attempt to get same frame data more than
-        # once
+        # These values will be None if attempt to get data from same frame
         frame_num = frame_data[0]
-        timestamp = frame_data[1]
-        temperature_mK = frame_data[2]
-        mask = frame_data[3]
+        frame_time_ms = frame_data[1]
+        temperature_cK = frame_data[2]
+        telemetry = frame_data[3]
+        image = frame_data[4]
+        mask = frame_data[5]
 
 def terminate(thread):
     # Join the Lepton thread
@@ -55,8 +55,7 @@ def terminate(thread):
     # Decode the recorded data
     if RECORD:
         writer = Videowriter()
-        writer.make_video()
-        raw_data = decode_recording_data()
+        result, raw_data = writer.make_video()
         return raw_data
 
 

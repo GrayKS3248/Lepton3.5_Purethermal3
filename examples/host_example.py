@@ -7,7 +7,6 @@ import numpy as np
 # Package modules
 from lepton import Lepton
 from lepton import Videowriter
-from lepton import decode_recording_data
 from lepton import Host
 
 
@@ -54,8 +53,8 @@ def main(lepton):
         
         # While lepton is streaming, get and send frame data
         while lepton.is_streaming():
-            frame_data = lepton.get_frame_data(focused_ok=True, as_bytes=True)
-            if frame_data[1] == b'': continue
+            frame_data = lepton.get_frame_data(focused_ok=True, encoded=True)
+            if any([f is None for f in frame_data]): continue
         
             ret = host.send_msgs(frame_data)
             if ret != np.sum([len(dat) for dat in frame_data]):
@@ -69,8 +68,7 @@ def terminate(thread):
     # Decode the recorded data
     if RECORD:
         writer = Videowriter()
-        writer.make_video()
-        raw_data = decode_recording_data()
+        result, raw_data = writer.make_video()
         return raw_data
 
 
