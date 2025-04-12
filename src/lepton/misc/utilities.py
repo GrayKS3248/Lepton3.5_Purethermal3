@@ -28,12 +28,12 @@ def print_exception(e, function):
 
 def safe_run(function, stop_function=None, args=(), stop_args=()):
     try: 
-        function(*args)
-        return 0
+        output = function(*args)
+        return (0, output)
     except BaseException as e:
         if not stop_function is None: stop_function(*stop_args)
         print_exception(e, function)
-        return -1
+        return (-1, None)
 
 
 @dataclass

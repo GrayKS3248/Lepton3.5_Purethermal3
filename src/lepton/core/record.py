@@ -1,9 +1,7 @@
 # Std modules
 import os
-import ast
 import zlib
 from fractions import Fraction
-from copy import copy
 import textwrap
 import inspect
 
@@ -14,42 +12,190 @@ from lepton.misc.utilities import safe_run, ESC
 # External modules
 import cv2
 import numpy as np
+from numpy.ma import masked_array
 import av
 
 
-def decode_recording_data(dirpath='rec_data', telemetry_file='telem.json',
+def _encode_msg(msg, typ):
+    # Ensure all data is of type numpy array
+    data = np.array([msg])
+    if len(data.shape) > 1:
+        data = np.squeeze(data, axis=0)
+    
+    # Define data types
+    uints = ['B', 'H', 'L', 'Q']
+    ints = ['b', 'h', 'l', 'q']
+    floats = ['e', 'f', 'd']
+    bools = ['?']
+    strs = ['U']
+    all_types = uints + ints + floats + bools + strs
+    
+    # Get the target type character
+    typ_char = np.dtype(typ).char
+    if not typ_char in all_types:
+        return b''
+    
+    # Split strings into chars
+    if data.dtype.char == 'U':
+        temp = []
+        length = max([len(d) for d in data])
+        for d in data:
+            char_list = list(d)
+            while len(char_list) < length:
+                char_list.append(' ')
+            temp.append(char_list)
+        data = np.array(temp) 
+    
+    # Temporarily replace nan values with 0 so rounding and casting will work
+    if data.dtype.char in floats:
+        nan_mask = np.isnan(data)
+        data[nan_mask] = 0
+    else:
+        nan_mask = np.zeros(data.shape, dtype=bool)
+
+    # Round the data if going from float to int and type cast
+    if data.dtype.char in floats and typ_char in uints+ints:
+        data = np.round(data)
+        
+    # Convert to unicode code point if going from string to anything else
+    if data.dtype.char == 'U' and typ_char != 'U':
+        data = np.vectorize(ord)(data)
+        
+    # Type cast
+    data = data.astype(typ)
+    
+    # Replace any previous nans with typ min
+    if np.any(nan_mask):
+        if typ in ints:
+            data[np.isnan(data)] = np.iinfo(typ).min
+        elif typ in floats:
+            data[np.isnan(data)] = np.finfo(typ).min
+        else:
+            return b''
+    
+    # Get the data shape and dimension
+    shape = np.array(data.shape, dtype=np.uint16)
+    dim = np.uint8(len(shape))
+    
+    # Flatten the data for encoding
+    data = data.flatten()
+    
+    # Get the type code
+    typ_code = dict(zip(all_types, np.arange(len(all_types), dtype=np.uint8)))
+    code = typ_code[typ_char]
+    
+    # Build and compress the message
+    msg = dim.tobytes() + shape.tobytes() + code.tobytes() + data.tobytes()
+    msg = zlib.compress(msg)
+    msg += b'DELIM'
+    return msg
+
+def _decode_msg(msg):
+    # Decompress and read the header
+    data = zlib.decompress(msg)
+    dim = np.frombuffer(data[0:1],np.uint8)[0]
+    shape = np.frombuffer(data[1:1+2*dim],np.uint16)
+    code = np.frombuffer(data[1+2*dim:2+2*dim],np.uint8)[0]
+    
+    # Define data types
+    uints = ['B', 'H', 'L', 'Q']
+    ints = ['b', 'h', 'l', 'q']
+    floats = ['e', 'f', 'd']
+    bools = ['?']
+    strs = ['U1']
+    all_types = uints + ints + floats + bools + strs
+    
+    # Build type code dictionary
+    typ_code = dict(zip(np.arange(len(all_types), dtype=np.uint8), all_types))
+    typ_char = typ_code[code]
+    
+    # Decode the message
+    data = np.frombuffer(data[2+2*dim:],typ_char).reshape(shape)
+    data = data.copy()
+    
+    # If type U1, convert from char list to string
+    if typ_char == 'U1':
+        data = np.array([''.join(d).rstrip() for d in data])
+    
+    # Replace nan values with masked array
+    if typ_char in ints:
+        nan_mask = data == np.iinfo(typ_char).min
+        if np.any(nan_mask):
+            data = masked_array(data, nan_mask)
+    elif typ_char in floats:
+        nan_mask = data == np.finfo(typ_char).min
+        if np.any(nan_mask):
+            data = masked_array(data, nan_mask)
+    
+    # Return the decoded data
+    return data
+
+def encode_frame_data(frame_data, types):
+    msgs = []
+    for d, t in zip(frame_data, types):
+        msgs.append(_encode_msg(d, t))
+    return tuple(msgs)
+
+def decode_frame_data(frame_data):
+    msgs = []
+    for d in frame_data:
+        msgs.append(_decode_msg(d))
+    return tuple(msgs)
+    
+def _read_DELIMed(path):
+    with open(path, 'rb') as f:
+        data = f.read().split(b'DELIM')
+    if len(data) > 1: return data[:-1]
+    else: return None
+
+def decode_recording_data(dirpath='rec_data',
+                          frame_number_file='frame_number.dat',
+                          frame_time_file='frame_time.dat',
                           temperature_file='temperature.dat',
+                          telemetry_file='telem.dat',
+                          image_file='image.dat',
                           mask_file='mask.dat'):
     print("Decoding raw data... ", end='', flush=True)
-    _read_DELIMed = Videowriter()._read_DELIMed
-    _decode_bytes = Videowriter()._decode_bytes
+    _frame_number = _read_DELIMed(os.path.join(dirpath, frame_number_file))
+    _frame_time = _read_DELIMed(os.path.join(dirpath, frame_time_file))
+    _temperature = _read_DELIMed(os.path.join(dirpath, temperature_file))
+    _telemetry = _read_DELIMed(os.path.join(dirpath, telemetry_file))
+    _image = _read_DELIMed(os.path.join(dirpath, image_file))
+    _mask = _read_DELIMed(os.path.join(dirpath, mask_file))
     
-    with open(os.path.join(dirpath, telemetry_file), 'r') as f:
-        telems = _read_DELIMed(f, 'r')
-    if telems == None:
-        timestamps_ms = None
-    else:
-        telems=[ast.literal_eval(''.join(t)) for t in telems]
-        timestamps_ms=[t['Uptime (ms)'] for t in telems]
+    if (_frame_number is None or _frame_time is None or _temperature is None or
+        _telemetry is None or _image is None or _mask is None):
+        print("{}No video data found.{}".format(ESC.WARNING, ESC.ENDC),
+              flush = True)
+        return None
     
-    with open(os.path.join(dirpath, temperature_file), 'rb') as f:
-        t_cK = _read_DELIMed(f, 'rb')
-    if t_cK == None:
-        temperatures_C = None
-    else:
-        temperatures_C = [0.01*_decode_bytes(t)-273.15 for t in t_cK]
+    zipped = zip(_frame_number, _frame_time, _temperature, 
+                 _telemetry, _image, _mask)
+    frame_number = []
+    frame_time_s = []
+    temperature_C = []
+    telemetry = []
+    image = []
+    mask = []
+    for fn, ft, T, t, i, m in zipped:
+        frame_data = decode_frame_data((fn, ft, T, t, i, m))
+        frame_number.append(tuple([int(d) for d in frame_data[0]]))
+        frame_time_s.append(tuple([round(float(d)*0.001,3) 
+                                   for d in frame_data[1]]))
+        temperature_C.append(frame_data[2].astype(float)*0.01-273.15)
+        telemetry.append(eval(frame_data[3][0]))
+        image.append(frame_data[4])
+        mask.append(frame_data[5])
     
-    with open(os.path.join(dirpath, mask_file), 'rb') as f:
-        masks = _read_DELIMed(f, 'rb')
-    if masks != None:
-        masks = [_decode_bytes(m, compressed=True) for m in masks]
-    
-    data = {'Temperature (C)' : temperatures_C,
-            'Mask' : masks,
-            'Timestamp (ms)' : timestamps_ms,
-            'Telemetry': telems}
+    data = {'Frame Number (Lepton, Capture)' : frame_number,
+            'Frame Time (s) (Lepton, Wall)' : frame_time_s,
+            'Temperature (C)' : temperature_C,
+            'Telemetry' : telemetry,
+            'Image' : image,
+            'Mask' : mask,}
+            
     print("{}Done.{}".format(ESC.OKCYAN, ESC.ENDC), flush=True)
-    return data
+    return data        
 
 
 class Videowriter():
@@ -59,16 +205,6 @@ class Videowriter():
         self.DIR_PATH = dirpath
         self.TELEMETRY_FILE = telemetry_file
         self.IMAGE_FILE = image_file
-    
-    def _read_DELIMed(self, f, mode='r'):
-        data = []
-        if mode == 'r':
-            data = f.read().split('DELIM')
-        elif mode == 'rb':
-            data = f.read().split(b'DELIM')
-            
-        if len(data) > 1: return data[:-1]
-        else: return None
     
     def _decode_bytes(self, byts, compressed=False):
         if compressed:
@@ -114,49 +250,36 @@ class Videowriter():
             print("{}{}{}".format(ESC.FAIL,bars,ESC.ENDC), flush=True)
             return self._get_valid_name(rec_name)
 
-    def _make_video(self):
-        print("Writing video... ", end='', flush=True)
-        with open(os.path.join(self.DIR_PATH, self.TELEMETRY_FILE), 'r') as f:
-            telems = self._read_DELIMed(f, 'r')
-        if telems == None:
-            print("{}No video data found.{}".format(ESC.WARNING, ESC.ENDC),
-                  flush = True)
-            return
-            
-        telems = [ast.literal_eval(''.join(t)) for t in telems]
-        with open(os.path.join(self.DIR_PATH, self.IMAGE_FILE), 'rb') as f:
-            images = self._read_DELIMed(f, 'rb')
-        images = [self._decode_bytes(i) for i in images]
+    def _make_video(self, playback_speed):
+        frames = decode_recording_data()
         
+        print("Writing video... ", end='', flush=True)
         with av.open(self.REC_NAME, mode="w") as container:
-            steam_is_set = False
-            vid_stream = container.add_stream("h264", rate=33)
+            rate = min(120, max(20, int(np.round(30*playback_speed))))
+            vid_stream = container.add_stream("h264", rate=rate)
             vid_stream.pix_fmt = "yuv420p"
             vid_stream.bit_rate = 10_000_000
-            vid_stream.codec_context.time_base = Fraction(1, 33)
+            vid_stream.codec_context.time_base = Fraction(1, rate)
+            vid_stream.width = frames['Image'][0].shape[1]
+            vid_stream.height = frames['Image'][0].shape[0]
 
-            epoch = None
-            prev_time = -np.inf
-            for telem, image in zip(telems, images):
-                if telem['Uptime (ms)']==0: continue
-                if telem['Video format']=='': continue
-                time = telem['Uptime (ms)']
-                if epoch is None: epoch = time
-                time = 0.001*(time - epoch)
-                if time <= prev_time: continue
-    
-                if not steam_is_set:
-                    vid_stream.width = image.shape[1]
-                    vid_stream.height = image.shape[0]
-                    steam_is_set = True
-                
+            # If LOS occured, lepton frame number and/or time will be 
+            # non-monotonic. In this case, must use wall time.
+            frm = np.array(frames['Frame Number (Lepton, Capture)'])[:,0]
+            time = np.array(frames['Frame Time (s) (Lepton, Wall)'])[:,0]
+            if np.any(np.diff(frm) <= 0.0) or np.any(np.diff(time) <= 0.0):
+                time = np.array(frames['Frame Time (s) (Lepton, Wall)'])[:,1]
+            epoch_time = time - time[0]
+            
+            speed_adjusted_epoch_time = epoch_time / playback_speed
+            for t, image in zip(speed_adjusted_epoch_time, frames['Image']):
                 frame = av.VideoFrame.from_ndarray(image, format="rgb24")
-                frame.pts = int(round(time/vid_stream.codec_context.time_base))
+                frame.pts = int(round(t/vid_stream.codec_context.time_base))
                 for packet in vid_stream.encode(frame):
                     container.mux(packet)
-                prev_time = copy(time)
         print("{}Done.{}".format(ESC.OKCYAN, ESC.ENDC), flush=True)
+        return frames
 
-    def make_video(self):
-        return safe_run(self._make_video)
+    def make_video(self, playback_speed=1.0):
+        return safe_run(self._make_video, args=(playback_speed,))
             
