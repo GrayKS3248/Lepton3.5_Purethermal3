@@ -22,6 +22,7 @@ def main():
             if frame_data == NULL: break
             if frame_data == EOT: break
         
+            # Convert encoded frame data to readble format
             frame_data = decode_frame_data(frame_data)
             frame_num = tuple(frame_data[0].tolist())
             frame_time = tuple([round(float(f)*.001,3) for f in frame_data[1]])

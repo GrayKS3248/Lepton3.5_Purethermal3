@@ -706,7 +706,7 @@ class Lepton():
                 # If the frame is captured during camera boot, ignore it
                 # If the frame is an FFC frame, ignore it
                 if (telemetry['FFC state'] == 'never commanded' or
-                    telemetry['FFC state']=='in progress'):
+                    telemetry['FFC state'] == 'in progress'):
                     continue
                 
                 with self._LOCK:
@@ -967,7 +967,7 @@ class Lepton():
             
             frame_time_ms = copy(self._frame_time_buffer[-1])
             temperature_C = copy(self._temperature_C_buffer[-1])
-            temperature_cK = 100.*(temperature_C+273.15)
+            temperature_cK = (100.*(temperature_C+273.15)).astype(np.uint16)
             telemetry = str(copy(self._telemetry_buffer[-1]))
             image = copy(self._image_buffer[-1])
             mask = copy(self._mask_buffer[-1])
@@ -993,7 +993,6 @@ class Lepton():
         if encoded and not any([f is None for f in frame_data]):
             frame_data = encode_frame_data(frame_data, 
                                            ['L', 'L', 'H', 'U', 'B', '?'])
-            frame_data = tuple([f[:-5] for f in frame_data])
         return frame_data
     
     def is_streaming(self):
