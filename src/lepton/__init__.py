@@ -3,6 +3,8 @@ from lepton.core import (Capture, # NOQA
                          Lepton,
                          Detector,
                          Videowriter,
+                         encode_msg,
+                         decode_msg,
                          encode_frame_data,
                          decode_frame_data,
                          decode_recording_data,)
@@ -17,4 +19,4 @@ from lepton.comm import (Host, # NOQA
 from lepton.main import leprun # NOQA
 
 
-__version__ = '0.2.b0'
+__version__ = '0.2.b1'

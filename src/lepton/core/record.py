@@ -16,7 +16,7 @@ from numpy.ma import masked_array
 import av
 
 
-def _encode_msg(msg, typ):
+def encode_msg(msg, typ):
     # Ensure all data is of type numpy array
     data = np.array([msg])
     if len(data.shape) > 1:
@@ -87,10 +87,9 @@ def _encode_msg(msg, typ):
     # Build and compress the message
     msg = dim.tobytes() + shape.tobytes() + code.tobytes() + data.tobytes()
     msg = zlib.compress(msg)
-    msg += b'DELIM'
     return msg
 
-def _decode_msg(msg):
+def decode_msg(msg):
     # Decompress and read the header
     data = zlib.decompress(msg)
     dim = np.frombuffer(data[0:1],np.uint8)[0]
@@ -133,19 +132,25 @@ def _decode_msg(msg):
 def encode_frame_data(frame_data, types):
     msgs = []
     for d, t in zip(frame_data, types):
-        msgs.append(_encode_msg(d, t))
+        msgs.append(encode_msg(d, t))
     return tuple(msgs)
 
 def decode_frame_data(frame_data):
     msgs = []
     for d in frame_data:
-        msgs.append(_decode_msg(d))
+        msgs.append(decode_msg(d))
     return tuple(msgs)
     
-def _read_DELIMed(path):
+def _read_chunked(path):
     with open(path, 'rb') as f:
-        data = f.read().split(b'DELIM')
-    if len(data) > 1: return data[:-1]
+        data = []
+        while True:
+            msg_len = f.read(8)
+            if len(msg_len) < 8:
+                break
+            msg = f.read(int(msg_len))
+            data.append(decode_msg(msg))
+    if len(data) > 0: return data
     else: return None
 
 def decode_recording_data(dirpath='rec_data',
@@ -156,17 +161,16 @@ def decode_recording_data(dirpath='rec_data',
                           image_file='image.dat',
                           mask_file='mask.dat'):
     print("Decoding raw data... ", end='', flush=True)
-    _frame_number = _read_DELIMed(os.path.join(dirpath, frame_number_file))
-    _frame_time = _read_DELIMed(os.path.join(dirpath, frame_time_file))
-    _temperature = _read_DELIMed(os.path.join(dirpath, temperature_file))
-    _telemetry = _read_DELIMed(os.path.join(dirpath, telemetry_file))
-    _image = _read_DELIMed(os.path.join(dirpath, image_file))
-    _mask = _read_DELIMed(os.path.join(dirpath, mask_file))
+    _frame_number = _read_chunked(os.path.join(dirpath, frame_number_file))
+    _frame_time = _read_chunked(os.path.join(dirpath, frame_time_file))
+    _temperature = _read_chunked(os.path.join(dirpath, temperature_file))
+    _telemetry = _read_chunked(os.path.join(dirpath, telemetry_file))
+    _image = _read_chunked(os.path.join(dirpath, image_file))
+    _mask = _read_chunked(os.path.join(dirpath, mask_file))
     
     if (_frame_number is None or _frame_time is None or _temperature is None or
         _telemetry is None or _image is None or _mask is None):
-        print("{}No video data found.{}".format(ESC.WARNING, ESC.ENDC),
-              flush = True)
+        print(ESC.warning('No or incomplete video data found.'), flush=True)
         return None
     
     zipped = zip(_frame_number, _frame_time, _temperature, 
@@ -178,14 +182,12 @@ def decode_recording_data(dirpath='rec_data',
     image = []
     mask = []
     for fn, ft, T, t, i, m in zipped:
-        frame_data = decode_frame_data((fn, ft, T, t, i, m))
-        frame_number.append(tuple([int(d) for d in frame_data[0]]))
-        frame_time_s.append(tuple([round(float(d)*0.001,3) 
-                                   for d in frame_data[1]]))
-        temperature_C.append(frame_data[2].astype(float)*0.01-273.15)
-        telemetry.append(eval(frame_data[3][0]))
-        image.append(frame_data[4])
-        mask.append(frame_data[5])
+        frame_number.append(tuple([int(d) for d in fn]))
+        frame_time_s.append(tuple([round(0.001*float(d),3) for d in ft]))
+        temperature_C.append(0.01*T.astype(float)-273.15)
+        telemetry.append(eval(t[0]))
+        image.append(i)
+        mask.append(m)
     
     data = {'Frame Number (Lepton, Capture)' : frame_number,
             'Frame Time (s) (Lepton, Wall)' : frame_time_s,

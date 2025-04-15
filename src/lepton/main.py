@@ -13,7 +13,7 @@ def _parse_args():
     parser.add_argument('-p', '--port', help="Lepton camera port", 
                         type=int, default=0)
     parser.add_argument('-r', "--record", help="record data stream", 
-                        action=argparse.BooleanOptionalAction, default=False)
+                        action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument('-n', "--name", help="name of saved video file", 
                         type=str, default="recording")
     parser.add_argument('-c', "--cmap", help="colormap used in viewer", 
@@ -29,7 +29,7 @@ def _parse_args():
                         help="apply histogram equalization to image", 
                         action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument('-d', "--detect", help="if moving fronts are detected", 
-                        action=argparse.BooleanOptionalAction, default=False)
+                        action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument('-m', "--multiframe", help="detection type", 
                         action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument('-f', "--fps", help="target FPS of camera", 

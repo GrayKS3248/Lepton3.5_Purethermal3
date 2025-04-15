@@ -757,12 +757,13 @@ class Lepton():
             mask = np.zeros(temperature_C.shape, dtype=bool)
         return (frame_num,frame_time_ms,temperature_cK,telemetry,image,mask,)
     
-    def _write_frame(self, frame_data, files):
+    def _write_chunked_frame(self, frame_data, files):
         if all(d is None for d in frame_data): return
         encoded = encode_frame_data(frame_data, ['L', 'L', 'H', 'U', 'B', '?'])
         for f, e in zip(files, encoded):
-            f.write(e)
-    
+            msg_len = bytes('{:08d}'.format(len(e)), 'utf-8')
+            f.write(msg_len + e)
+            
     def _estop_record(self):
         self._estop_stream()
         msg = "Emergency stopping record... "
@@ -848,7 +849,7 @@ class Lepton():
                     frame_data = self._get_writable_frame(ignore_buf_min=False)
                     self._keypress_callback()
                     
-                self._write_frame(frame_data, files)
+                self._write_chunked_frame(frame_data, files)
                 cv2.imshow(self.WINDOW_NAME, image) 
                 self._frame_count += 1
                 
@@ -861,7 +862,7 @@ class Lepton():
                     term_frame_data.append(frame_data)
                 self._flag_recording = False  
             for frame_data in term_frame_data:
-                self._write_frame(frame_data, files)
+                self._write_chunked_frame(frame_data, files)
             
         time.sleep(1.0) # Wait for other tasks out of thread
         print(ESC.header(''.join(['-']*60)), flush=True)
