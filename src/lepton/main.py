@@ -36,7 +36,7 @@ def _parse_args():
                         type=int, default=None)
     parser.add_argument('-o', "--overlay", 
                         help=argparse.SUPPRESS, 
-                        action=argparse.BooleanOptionalAction, default=True)
+                        action=argparse.BooleanOptionalAction, default=False)
 
     args = parser.parse_args()
     return args

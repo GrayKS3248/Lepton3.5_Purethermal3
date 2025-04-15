@@ -359,7 +359,7 @@ class Lepton():
         warped = warped[t:b+1,l:r+1].astype(typ)
         return warped
     
-    def _warp_deque(self, buffer, n=3):
+    def _warp_deque(self, buffer, n):
         buffer_len = len(buffer)
         warped_buffer = []
         for i in range(buffer_len):
@@ -397,7 +397,7 @@ class Lepton():
             return
         
         if multiframe:
-            temps = self._warp_deque(self._temperature_C_buffer)
+            temps = self._warp_deque(self._temperature_C_buffer, n=3)
         else:
             temps = [self._warp_element(self._temperature_C_buffer[-1])]
         mask = self.detector.front(temps, 'kmeans')
@@ -598,7 +598,7 @@ class Lepton():
             image[mask] = [0,255,0]
                 
         shp = (image.shape[1]*self.SHOW_SCALE, image.shape[0]*self.SHOW_SCALE)
-        image = cv2.resize(image, shp, interpolation=cv2.INTER_NEAREST)
+        image = cv2.resize(image, shp, interpolation=cv2.INTER_CUBIC)
         
         show_im, warped = self._get_focus_box(image)
         rec_im = copy(show_im) if warped else image
