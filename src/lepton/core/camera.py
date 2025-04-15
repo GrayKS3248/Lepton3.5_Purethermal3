@@ -35,18 +35,15 @@ class Capture():
         if self.FLAG_OVERLAY:
             parent = os.path.dirname(os.path.realpath(__file__))
             overlay_dirpath = os.path.join(parent, r'_media')
-            with open(os.path.join(overlay_dirpath,'overlay.cdat'), 'rb') as f:
+            fname = r'overlay.cdat'
+            with open(os.path.join(overlay_dirpath, fname), 'rb') as f:
                 c_binary = f.read()
             binary = bz2.decompress(c_binary)
-            shape = np.frombuffer(binary[0:2], np.uint8)
-            chunk_size = int(shape[0])*int(shape[1])
-            bin_data = binary[2:]  
-            self.OVERLAY_FRMS = []
-            for i in range(0, len(bin_data), chunk_size):
-                chunk = bin_data[i:i+chunk_size]
-                img = np.frombuffer(chunk,np.uint8).reshape(shape)
-                self.OVERLAY_FRMS.append(img)
-            self.OVERLAY_LEN = len(self.OVERLAY_FRMS)
+            shape = np.frombuffer(binary[0:6], np.uint16)
+            bin_data = binary[6:]
+            self.OVERLAY_FRMS = np.frombuffer(bin_data, np.uint8)
+            self.OVERLAY_FRMS = self.OVERLAY_FRMS.reshape(shape)
+            self.OVERLAY_LEN = len(self.OVERLAY_FRMS[0,0,:])
             self.overlay_n = 0
             
         self.prev_frame_time = self._time()
@@ -77,7 +74,7 @@ class Capture():
     
     def _overlay(self, img):
         overlay_img = -1*np.ones((160,122))
-        foreground = self.OVERLAY_FRMS[self.overlay_n]
+        foreground = self.OVERLAY_FRMS[:,:,self.overlay_n]
         overlay_img[:,34:-35] = foreground
         overlay_img = np.flip(overlay_img.T,axis=1)
         theta = 0.05
