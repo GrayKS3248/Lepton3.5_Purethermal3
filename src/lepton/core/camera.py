@@ -1,7 +1,7 @@
 # Std modules
 import os
 import struct
-import zlib
+import bz2
 import time
 from collections import deque
 from copy import copy
@@ -36,13 +36,16 @@ class Capture():
             parent = os.path.dirname(os.path.realpath(__file__))
             overlay_dirpath = os.path.join(parent, r'_media')
             with open(os.path.join(overlay_dirpath,'overlay.cdat'), 'rb') as f:
-                bindat = f.read()
-            decoded = zlib.decompress(bindat).split(b'DELIM')
-            shape = np.frombuffer(decoded[0], dtype=np.uint8)
-            decoded.pop()
-            decoded.pop(0)
-            self.OVERLAY_FRMS = [np.frombuffer(d,dtype=np.uint8).reshape(shape) 
-                                 for d in decoded]
+                c_binary = f.read()
+            binary = bz2.decompress(c_binary)
+            shape = np.frombuffer(binary[0:2], np.uint8)
+            chunk_size = int(shape[0])*int(shape[1])
+            bin_data = binary[2:]  
+            self.OVERLAY_FRMS = []
+            for i in range(0, len(bin_data), chunk_size):
+                chunk = bin_data[i:i+chunk_size]
+                img = np.frombuffer(chunk,np.uint8).reshape(shape)
+                self.OVERLAY_FRMS.append(img)
             self.OVERLAY_LEN = len(self.OVERLAY_FRMS)
             self.overlay_n = 0
             
