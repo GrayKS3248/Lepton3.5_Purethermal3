@@ -53,13 +53,15 @@ def leprun(args=None):
 
     lepton = Lepton(args.port, args.cmap, args.scale_factor, args.overlay)
     if not args.record:
-        lepton.start_stream(fps=args.fps, detect_fronts=args.detect, 
-                            multiframe=args.multiframe, equalize=args.equalize)
-        return None
+        _ = lepton.start_stream(fps=args.fps, 
+                                detect_fronts=args.detect, 
+                                multiframe=args.multiframe,
+                                equalize=args.equalize)
     
     else:
-        lepton.start_record(fps=args.fps, detect_fronts=args.detect,
-                            multiframe=args.multiframe, equalize=args.equalize)
+        _ = lepton.start_record(fps=args.fps,
+                                detect_fronts=args.detect,
+                                multiframe=args.multiframe, 
+                                equalize=args.equalize)
         writer = Videowriter(rec_name=args.name)
-        recorded_data = writer.make_video()
-        return recorded_data
+        _ = writer.make_video()
