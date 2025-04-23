@@ -67,9 +67,9 @@ def encode_msg(msg, typ):
     # Replace any previous nans with typ min
     if np.any(nan_mask):
         if typ_char in ints:
-            data[np.isnan(data)] = np.iinfo(typ).min
+            data[nan_mask] = np.iinfo(typ).min
         elif typ_char in floats:
-            data[np.isnan(data)] = np.finfo(typ).min
+            data[nan_mask] = np.finfo(typ).min
         else:
             return b''
     
