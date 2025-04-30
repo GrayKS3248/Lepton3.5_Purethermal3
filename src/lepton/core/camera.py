@@ -718,7 +718,7 @@ class Lepton():
                     if ((self._buf_len()>0 and 
                         (self._frame_number_buffer[-1][0]==frame_num or
                          self._frame_time_buffer[-1][0]==frame_tim)) or 
-                        frame_num[0] > 1555200):
+                        frame_num > 1555200):
                         continue
                     
                     self._frame_number_buffer.append((frame_num,
@@ -838,7 +838,7 @@ class Lepton():
                     if ((self._buf_len()>0 and 
                         (self._frame_number_buffer[-1][0]==frame_num or
                          self._frame_time_buffer[-1][0]==frame_tim)) or 
-                        frame_num[0] > 1555200):
+                        frame_num > 1555200):
                         continue
                     
                     self._frame_number_buffer.append((frame_num,
