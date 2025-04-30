@@ -709,14 +709,16 @@ class Lepton():
                     telemetry['FFC state'] == 'in progress'):
                     continue
                 
+                frame_num = telemetry['Frame count since reboot']
+                frame_tim = telemetry['Uptime (ms)']
                 with self._LOCK:
                     # Check for FFC in progress by un-updated frame number
-                    # or frame time
-                    frame_num = telemetry['Frame count since reboot']
-                    frame_tim = telemetry['Uptime (ms)']
-                    if (self._buf_len()>0 and 
+                    # or frame time or by very large frame number 
+                    # (>48 hours of streaming)
+                    if ((self._buf_len()>0 and 
                         (self._frame_number_buffer[-1][0]==frame_num or
-                         self._frame_time_buffer[-1][0]==frame_tim)):
+                         self._frame_time_buffer[-1][0]==frame_tim)) or 
+                        frame_num[0] > 1555200):
                         continue
                     
                     self._frame_number_buffer.append((frame_num,
@@ -827,14 +829,16 @@ class Lepton():
                     telemetry['FFC state']=='in progress'):
                     continue
                 
+                frame_num = telemetry['Frame count since reboot']
+                frame_tim = telemetry['Uptime (ms)']
                 with self._LOCK:
                     # Check for FFC in progress by un-updated frame number
-                    # or frame time
-                    frame_num = telemetry['Frame count since reboot']
-                    frame_tim = telemetry['Uptime (ms)']
-                    if (self._buf_len()>0 and 
+                    # or frame time or by very large frame number 
+                    # (>48 hours of streaming)
+                    if ((self._buf_len()>0 and 
                         (self._frame_number_buffer[-1][0]==frame_num or
-                         self._frame_time_buffer[-1][0]==frame_tim)):
+                         self._frame_time_buffer[-1][0]==frame_tim)) or 
+                        frame_num[0] > 1555200):
                         continue
                     
                     self._frame_number_buffer.append((frame_num,
