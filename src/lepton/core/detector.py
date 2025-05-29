@@ -307,3 +307,61 @@ class Detector():
         # Return the detected front instances
         return front_mask
     
+    
+import os
+import matplotlib.pyplot as plt
+from matplotlib import colormaps as cmap
+def make(d, sd, ns, c=(None, None)):
+    
+    if c[0] is None and c[1] is None:
+        T = [cv2.imread(os.path.join(d,sd,n))[:,:,0]*0.7059+20 
+             for n in ns]
+    elif c[0] is None and not c[1] is None:
+        T = [cv2.imread(os.path.join(d,sd,n))[:,c[1][0]:c[1][1],0]*0.7059+20 
+             for n in ns]
+    elif not c[0] is None and c[1] is None:
+        T = [cv2.imread(os.path.join(d,sd,n))[c[0][0]:c[0][1],:,0]*0.7059+20 
+             for n in ns]
+    else:
+        T = [cv2.imread(os.path.join(d,sd,n))[c[0][0]:c[0][1],
+                                              c[1][0]:c[1][1],0]*0.7059+20 
+             for n in ns]
+    m = Detector()._kmeans(T)
+    T0 = cmap['inferno'](np.clip(np.round((T[-1]-20)*1.4166),0,255)/255)
+    T0m = T0.copy()
+    T0m[m] = [0., 1., 0., 1.]
+    plt.imshow(T0m)
+    plt.show()
+    plt.clf()
+    plt.close()
+    return T0, T0m
+if __name__ == "__main__":
+    d = r'C:/Users/Grayson/Docs/Repos/FP_Feeback_Control/Experimental Dataset/Images/Raw'
+    
+    sd = 'Rec-0223'
+    ns = ['frame_02650.png', 'frame_02660.png', 'frame_02770.png']
+    T0, T0m = make(d, sd, ns, c=((56,-56),(112,-192)))
+    
+    sd = 'Rec-0175'
+    ns = ['frame_02970.png', 'frame_02980.png', 'frame_02990.png']
+    T1, T1m = make(d, sd, ns, c=((56,-56),(112,-192)))
+    
+    sd = 'Long Fiber Tow Center Edge'
+    ns = ['frame_03000.png', 'frame_03010.png', 'frame_03020.png']
+    T2, T2m = make(d, sd, ns, c=((56,-56),(112,-192)))
+
+    
+    d = r'C:\Users\Grayson\Docs\Repos\FP_Feedback_Control_Hardware'
+    sd = ''
+    ns = ['0.png', '1.png', '2.png']
+    T3, T3m = make(d, sd, ns, c=(None,(250,-149)))
+    
+    T0m = cv2.cvtColor(np.round(T0m*255).astype(np.uint8), cv2.COLOR_BGR2RGB)
+    T1m = cv2.cvtColor(np.round(T1m*255).astype(np.uint8), cv2.COLOR_BGR2RGB)
+    T2m = cv2.cvtColor(np.round(T2m*255).astype(np.uint8), cv2.COLOR_BGR2RGB)
+    T3m = cv2.cvtColor(np.round(T3m*255).astype(np.uint8), cv2.COLOR_BGR2RGB)
+    cv2.imwrite(os.path.join(d,'T0.png'), T0m)
+    cv2.imwrite(os.path.join(d,'T1.png'), T1m)
+    cv2.imwrite(os.path.join(d,'T2.png'), T2m)
+    cv2.imwrite(os.path.join(d,'T3.png'), T3m)
+    

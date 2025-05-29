@@ -39,7 +39,7 @@ dependencies = [
     "matplotlib",
     "scipy",
     "opencv-python",
-    "pyav",
+    "av",
 ]
 
 
