@@ -23,7 +23,63 @@ from scipy.signal import find_peaks
 
 
 class Capture():
-    def __init__(self, port, target_fps, overlay):
+    def __init__(self, port=0, target_fps=None, overlay=False, debug=False):
+        self.DEBUG = debug
+        if self.DEBUG:
+            target_fps = 9.0
+            self.uptime_ms = 0
+            self.frm_ct = 0
+            self.telemetry = {
+                    'Telemetry version': '14.0',
+                    'Uptime (ms)': self.uptime_ms,
+                    'FFC desired': 'not desired',
+                    'FFC state': 'complete',
+                    'AGC state': 'disabled',
+                    'Shutter lockout': 'not locked out',
+                    'Overtemp shutdown': 'not imminent',
+                    'Serial number (hex)': '1061088a240bcac2860c6c0700240000',
+                    'gpp version': '26.3.3',
+                    'dsp version': '26.3.3',
+                    'Frame count since reboot': self.frm_ct,
+                    'Frame mean': 3040,
+                    'FPA temperature (counts)': 7025,
+                    'FPA temperature (C)': 26.53,
+                    'Housing temperature (counts)': 9751,
+                    'Housing temperature (C)': 25.76,
+                    'FPA temperature at last FFC (C)': 26.12,
+                    'Uptime at last FFC (ms)': 0,
+                    'Housing temperature at last FFC (C)': 25.04,
+                    'AGC ROI (top left bottom right)': (0, 0, 159, 119),
+                    'AGC clip high': 19200,
+                    'AGC clip low': 512,
+                    'Video format': 'RAW14',
+                    'Number of frames used for FFC': 8,
+                    'Frame temperature min (C)': 20.34,
+                    'Frame temperature mean (C)': 22.71,
+                    'Frame temperature max (C)': 26.67,
+                    'Assumed emissivity': 1.0,
+                    'Assumed background temperature (C)': 22.0,
+                    'Assumed atmospheric transmission': 1.0,
+                    'Assumed atmospheric temperature (C)': 22.0,
+                    'Assumed window transmission': 1.0,
+                    'Assumed window reflection': 0.0,
+                    'Assumed window temperature (C)': 22.0,
+                    'Assumed reflected temperature (C)': 22.0,
+                    'Gain mode': 'high',
+                    'Effective gain mode': 'not in auto mode',
+                    'Desired gain mode': 'high',
+                    'Temperature switch high gain to low gain (C)': 115,
+                    'Temperature switch low gain to high gain (C)': 85,
+                    'Population switch high gain to low gain (%)': 25,
+                    'Population switch low gain to high gain (%)': 90,
+                    'Gain mode ROI (top left bottom right)': (0, 0, 119, 159),
+                    'TLinear enabled': 'True',
+                    'TLinear resolution': 0.01,
+                    'Spotmeter max temperature (C)': 23.12,
+                    'Spotmeter mean temperature (C)': 23.19,
+                    'Spotmeter min temperature (C)': 23.06,
+                    'Spotmeter population (px)': 4,
+                    'Spotmeter ROI (top left bottom right)': (59, 79, 60, 80)}
         self.PORT = port
         self.IMAGE_SHP = (160, 120)
         try:
@@ -49,9 +105,11 @@ class Capture():
         self.prev_frame_time = self._time()
         
     def __del__(self):
+        if self.DEBUG: return
         self.cap.release()
     
     def __enter__(self):
+        if self.DEBUG: return self
         self.cap = cv2.VideoCapture(self.PORT + cv2.CAP_DSHOW)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.IMAGE_SHP[0])
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.IMAGE_SHP[1]+2)
@@ -60,6 +118,7 @@ class Capture():
         return self
     
     def __exit__(self, exc_type, exc_value, traceback):
+        if self.DEBUG: return
         self.cap.release()
     
     def _time(self):
@@ -115,6 +174,16 @@ class Capture():
     
     def _decode_data(self, raw_data):
         temp_C = raw_data[:-2] * 0.01 - 273.15
+        
+        if self.DEBUG:
+            mn = float(round(np.min(temp_C),2))
+            me = float(round(np.mean(temp_C),2))
+            mx = float(round(np.max(temp_C),2))
+            self.telemetry['Uptime (ms)'] = self.uptime_ms
+            self.telemetry['Frame count since reboot'] = self.frm_ct
+            self.telemetry['Frame temperature min (C)'] = mn
+            self.telemetry['Frame temperature mean (C)'] = me
+            self.telemetry['Frame temperature max (C)'] = mx
         
         row_A = raw_data[-2,:80]
         row_B = raw_data[-2,80:]
@@ -219,6 +288,7 @@ class Capture():
         return (temp_C, telemetry, )
     
     def reacquire(self):
+        if self.DEBUG: return
         self.cap.release()
         time.sleep(5.0) # Wait to require for camera reboot
         self.cap = cv2.VideoCapture(self.PORT + cv2.CAP_DSHOW)
@@ -228,8 +298,15 @@ class Capture():
         self.cap.set(cv2.CAP_PROP_CONVERT_RGB, 0)
     
     def read(self):
-        self._wait_4_frametime()
-        res, im = self.cap.read()
+        if self.DEBUG: 
+            self._wait_4_frametime()
+            res = True
+            im = np.random.random(self.IMAGE_SHP)*5+17.5
+            self.uptime_ms += int(1000.*(self._time()-self.prev_frame_time))
+            self.frm_ct += 1
+        else:
+            self._wait_4_frametime()
+            res, im = self.cap.read()
         self.prev_frame_time = self._time()
         
         if not res:
@@ -252,12 +329,13 @@ class Capture():
 
 
 class Lepton():
-    def __init__(self, camera_port, cmap, scale_factor, overlay):
+    def __init__(self, camera_port, cmap, scale_factor, overlay, debug):
         # CONSTANTS (DO NOT TOUCH)
         self.PORT = camera_port
         self.CMAP = Cmaps[cmap]
         self.SHOW_SCALE = scale_factor
         self.OVERLAY = overlay
+        self.DEBUG = debug
         self.BUFFER_SIZE = 5
         self.WINDOW_NAME = 'Lepton 3.5 on Purethermal 3'
         self._LOCK = Lock()
@@ -668,7 +746,7 @@ class Lepton():
         print(ESC.OKCYAN+"Stopped."+ESC.ENDC, flush=True)
 
     def _stream(self, fps, detect_fronts, multiframe, equalize):
-        with Capture(self.PORT, fps, self.OVERLAY) as self.cap:
+        with Capture(self.PORT, fps, self.OVERLAY, self.DEBUG) as self.cap:
             if self._flag_emergency_stop:
                 with self._LOCK:
                     self._estop_stream()
@@ -803,7 +881,7 @@ class Lepton():
                   'telem.dat', 'image.dat', 
                   'mask.dat', 'warped_mask.dat']
         
-        with (Capture(self.PORT, fps, self.OVERLAY) as self.cap,
+        with (Capture(self.PORT, fps, self.OVERLAY, self.DEBUG) as self.cap,
               open(os.path.join(dirname, fnames[0]), 'wb') as fn_file,
               open(os.path.join(dirname, fnames[1]), 'wb') as ft_file,
               open(os.path.join(dirname, fnames[2]), 'wb') as T_file,

@@ -37,6 +37,9 @@ def _parse_args():
     parser.add_argument('-o', "--overlay", 
                         help=argparse.SUPPRESS, 
                         action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--debug", 
+                        help=argparse.SUPPRESS, 
+                        action=argparse.BooleanOptionalAction, default=False)
 
     args = parser.parse_args()
     return args
@@ -51,7 +54,8 @@ def leprun(args=None):
         wstr="Target FPS set below 5 can result in erroneous video rendering."
         print(ESC.WARNING+'WARNING: '+wstr+ESC.ENDC, flush=True)
 
-    lepton = Lepton(args.port, args.cmap, args.scale_factor, args.overlay)
+    lepton = Lepton(args.port, args.cmap, args.scale_factor, 
+                    args.overlay, args.debug)
     if not args.record:
         _ = lepton.start_stream(fps=args.fps, 
                                 detect_fronts=args.detect, 
