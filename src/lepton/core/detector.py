@@ -34,7 +34,8 @@ class Detector():
         self.hr = Hr # J - Kg^{-1}
         self.cp = Cp # J - Kg^{-1} - K^{-1}
     
-    def _kmeans(self, temperatures, n_iter=12, epsilon=0.04, n_try=8):
+    def _kmeans(self, temperatures, n_iter=12, epsilon=0.04, n_try=8,
+                min_temp=35.0):
         """
         Uses automatic thresholding of the temperature image, the 
         gradient of the temperature image, and the time derivative
@@ -53,6 +54,9 @@ class Detector():
         n_try : int, optional
             Number of times the kmeans algorithm is executed using different
             initial labellings. The default is 8.
+        min_temp : float, optional
+            The minimum cutoff temperature for front definition in Celcius. 
+            The default is 35.0.
 
         Returns
         -------
@@ -95,6 +99,10 @@ class Detector():
         t_lab = t_lab.reshape((l,w))
         t_mask = np.logical_or(t_lab==sort_t_cen[1,1],
                                t_lab==sort_t_cen[2,1])
+        
+        # Apply the minimum cutoff temperature
+        if not min_temp is None:
+            t_mask = np.logical_and(t_mask, bt>min_temp)
         
         # Get the L2 norm of the gradient of the temperature field
         dx, dy = np.gradient(bt)
