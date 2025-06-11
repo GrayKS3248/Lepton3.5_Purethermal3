@@ -757,11 +757,32 @@ class Lepton():
         mask = self._mask_buffer.popleft()
         if mask is None:
             mask = np.zeros(temperature_C.shape, dtype=bool)
-        return (frame_num,frame_time_ms,temperature_cK,telemetry,image,mask,)
+            
+        if self._flag_focus_box and not self._homography is None:
+            warped_temperature_C = self._warp_element(temperature_C)
+            warped_temperature_cK = 100.*(warped_temperature_C+273.15)
+            warped_temperature_cK = np.round(warped_temperature_cK)
+            warped_temperature_cK = warped_temperature_cK.astype(np.uint16)
+            warped_mask = self._warp_element(mask)
+            return (frame_num, frame_time_ms, 
+                    temperature_cK, warped_temperature_cK, 
+                    telemetry, image,
+                    mask, warped_mask,)
+        
+        warped_temperature_cK = np.zeros(temperature_C.shape)
+        warped_mask = np.zeros(temperature_C.shape, dtype=bool)
+        return (frame_num, frame_time_ms, 
+                temperature_cK, warped_temperature_cK,
+                telemetry, image,
+                mask, warped_mask)
+    
     
     def _write_chunked_frame(self, frame_data, files):
         if all(d is None for d in frame_data): return
-        encoded = encode_frame_data(frame_data, ['L', 'L', 'H', 'U', 'B', '?'])
+        encoded = encode_frame_data(frame_data, ['L', 'L', 
+                                                 'H', 'H', 
+                                                 'U', 'B',
+                                                 '?', '?'])
         for f, e in zip(files, encoded):
             msg_len = bytes('{:08d}'.format(len(e)), 'utf-8')
             f.write(msg_len + e)
@@ -777,16 +798,20 @@ class Lepton():
     def _record(self, fps, detect_fronts, multiframe, equalize):
         dirname = 'rec_data'
         os.makedirs(dirname, exist_ok=True)
-        fnames = ['frame_number.dat', 'frame_time.dat', 'temperature.dat', 
-                  'telem.dat', 'image.dat', 'mask.dat']
+        fnames = ['frame_number.dat', 'frame_time.dat', 
+                  'temperature.dat', 'warped_temperature.dat',
+                  'telem.dat', 'image.dat', 
+                  'mask.dat', 'warped_mask.dat']
         
         with (Capture(self.PORT, fps, self.OVERLAY) as self.cap,
               open(os.path.join(dirname, fnames[0]), 'wb') as fn_file,
               open(os.path.join(dirname, fnames[1]), 'wb') as ft_file,
               open(os.path.join(dirname, fnames[2]), 'wb') as T_file,
+              open(os.path.join(dirname, fnames[2]), 'wb') as wT_file,
               open(os.path.join(dirname, fnames[3]), 'wb') as t_file,
               open(os.path.join(dirname, fnames[4]), 'wb') as i_file,
-              open(os.path.join(dirname, fnames[5]), 'wb') as m_file,):
+              open(os.path.join(dirname, fnames[5]), 'wb') as m_file,
+              open(os.path.join(dirname, fnames[5]), 'wb') as wm_file, ):
             if self._flag_emergency_stop:
                 with self._LOCK:
                     self._estop_record()
@@ -795,7 +820,10 @@ class Lepton():
                 print(ESC.fail(msg), flush=True)
                 return
 
-            files = (fn_file, ft_file, T_file, t_file, i_file, m_file, )
+            files = (fn_file, ft_file, 
+                     T_file, wT_file,
+                     t_file, i_file,
+                     m_file, wm_file, )
             cv2.namedWindow(self.WINDOW_NAME, cv2.WINDOW_AUTOSIZE) 
             cv2.setMouseCallback(self.WINDOW_NAME, self._mouse_callback)
             with self._LOCK:
