@@ -184,6 +184,7 @@ class Capture():
             self.telemetry['Frame temperature min (C)'] = mn
             self.telemetry['Frame temperature mean (C)'] = me
             self.telemetry['Frame temperature max (C)'] = mx
+            return (temp_C, copy(self.telemetry), )
         
         row_A = raw_data[-2,:80]
         row_B = raw_data[-2,80:]
@@ -301,7 +302,8 @@ class Capture():
         if self.DEBUG: 
             self._wait_4_frametime()
             res = True
-            im = np.random.random(self.IMAGE_SHP)*5+17.5
+            im = (np.random.rand(self.IMAGE_SHP[1]+2,
+                             self.IMAGE_SHP[0])*500+29065).astype(np.uint16)
             self.uptime_ms += int(1000.*(self._time()-self.prev_frame_time))
             self.frm_ct += 1
         else:
