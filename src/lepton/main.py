@@ -13,7 +13,7 @@ def _parse_args():
     parser.add_argument('-p', '--port', help="Lepton camera port", 
                         type=int, default=0)
     parser.add_argument('-r', "--record", help="record data stream", 
-                        action=argparse.BooleanOptionalAction, default=True)
+                        action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument('-n', "--name", help="name of saved video file", 
                         type=str, default="recording")
     parser.add_argument('-c', "--cmap", help="colormap used in viewer", 
@@ -36,10 +36,10 @@ def _parse_args():
                         type=int, default=None)
     parser.add_argument('-o', "--overlay", 
                         help=argparse.SUPPRESS, 
-                        action=argparse.BooleanOptionalAction, default=True)
+                        action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--debug", 
                         help=argparse.SUPPRESS, 
-                        action=argparse.BooleanOptionalAction, default=True)
+                        action=argparse.BooleanOptionalAction, default=False)
 
     args = parser.parse_args()
     return args
