@@ -13,7 +13,7 @@ def _parse_args():
     parser.add_argument('-p', '--port', help="Lepton camera port", 
                         type=int, default=0)
     parser.add_argument('-r', "--record", help="record data stream", 
-                        action=argparse.BooleanOptionalAction, default=False)
+                        action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument('-n', "--name", help="name of saved video file", 
                         type=str, default="recording")
     parser.add_argument('-c', "--cmap", help="colormap used in viewer", 
@@ -36,10 +36,10 @@ def _parse_args():
                         type=int, default=None)
     parser.add_argument('-o', "--overlay", 
                         help=argparse.SUPPRESS, 
-                        action=argparse.BooleanOptionalAction, default=False)
+                        action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--debug", 
                         help=argparse.SUPPRESS, 
-                        action=argparse.BooleanOptionalAction, default=False)
+                        action=argparse.BooleanOptionalAction, default=True)
 
     args = parser.parse_args()
     return args
@@ -69,3 +69,6 @@ def leprun(args=None):
                                 equalize=args.equalize)
         writer = Videowriter(rec_name=args.name)
         _ = writer.make_video()
+        
+if __name__ == "__main__":
+    leprun()

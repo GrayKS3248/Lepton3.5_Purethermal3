@@ -157,44 +157,56 @@ def decode_recording_data(dirpath='rec_data',
                           frame_number_file='frame_number.dat',
                           frame_time_file='frame_time.dat',
                           temperature_file='temperature.dat',
+                          warped_temperature_file='warped_temperature.dat',
                           telemetry_file='telem.dat',
                           image_file='image.dat',
-                          mask_file='mask.dat'):
+                          mask_file='mask.dat',
+                          warped_mask_file='warped_mask.dat'):
     print("Decoding raw data... ", end='', flush=True)
     _frame_number = _read_chunked(os.path.join(dirpath, frame_number_file))
     _frame_time = _read_chunked(os.path.join(dirpath, frame_time_file))
     _temperature = _read_chunked(os.path.join(dirpath, temperature_file))
+    _warped_temperature = _read_chunked(os.path.join(dirpath,
+                                                     warped_temperature_file))
     _telemetry = _read_chunked(os.path.join(dirpath, telemetry_file))
     _image = _read_chunked(os.path.join(dirpath, image_file))
     _mask = _read_chunked(os.path.join(dirpath, mask_file))
+    _warped_mask = _read_chunked(os.path.join(dirpath, warped_mask_file))
     
     if (_frame_number is None or _frame_time is None or _temperature is None or
-        _telemetry is None or _image is None or _mask is None):
+        _warped_temperature is None or _telemetry is None or _image is None or 
+        _mask is None or _warped_mask is None):
         print(ESC.warning('No or incomplete video data found.'), flush=True)
         return None
     
-    zipped = zip(_frame_number, _frame_time, _temperature, 
-                 _telemetry, _image, _mask)
+    zipped = zip(_frame_number, _frame_time, _temperature, _warped_temperature,
+                 _telemetry, _image, _mask, _warped_mask)
     frame_number = []
     frame_time_s = []
     temperature_C = []
+    warped_temperature_C = []
     telemetry = []
     image = []
     mask = []
-    for fn, ft, T, t, i, m in zipped:
+    warped_mask = []
+    for fn, ft, T, wT, t, i, m, wm in zipped:
         frame_number.append(tuple([int(d) for d in fn]))
         frame_time_s.append(tuple([round(0.001*float(d),3) for d in ft]))
         temperature_C.append(0.01*T.astype(float)-273.15)
+        warped_temperature_C.append(0.01*wT.astype(float)-273.15)
         telemetry.append(eval(t[0]))
         image.append(i)
         mask.append(m)
+        warped_mask.append(wm)
     
     data = {'Frame Number (Lepton, Capture)' : frame_number,
             'Frame Time (s) (Lepton, Wall)' : frame_time_s,
             'Temperature (C)' : temperature_C,
+            'Warped Temperature (C)' : warped_temperature_C,
             'Telemetry' : telemetry,
             'Image' : image,
-            'Mask' : mask,}
+            'Mask' : mask,
+            'Warped Mask' : warped_mask,}
             
     print("{}Done.{}".format(ESC.OKCYAN, ESC.ENDC), flush=True)
     return data        

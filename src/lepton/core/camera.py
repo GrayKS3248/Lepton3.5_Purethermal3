@@ -841,8 +841,6 @@ class Lepton():
         if self._flag_focus_box and not self._homography is None:
             warped_temperature_C = self._warp_element(temperature_C)
             warped_temperature_cK = 100.*(warped_temperature_C+273.15)
-            warped_temperature_cK = np.round(warped_temperature_cK)
-            warped_temperature_cK = warped_temperature_cK.astype(np.uint16)
             warped_mask = self._warp_element(mask)
             return (frame_num, frame_time_ms, 
                     temperature_cK, warped_temperature_cK, 
@@ -887,11 +885,11 @@ class Lepton():
               open(os.path.join(dirname, fnames[0]), 'wb') as fn_file,
               open(os.path.join(dirname, fnames[1]), 'wb') as ft_file,
               open(os.path.join(dirname, fnames[2]), 'wb') as T_file,
-              open(os.path.join(dirname, fnames[2]), 'wb') as wT_file,
-              open(os.path.join(dirname, fnames[3]), 'wb') as t_file,
-              open(os.path.join(dirname, fnames[4]), 'wb') as i_file,
-              open(os.path.join(dirname, fnames[5]), 'wb') as m_file,
-              open(os.path.join(dirname, fnames[5]), 'wb') as wm_file, ):
+              open(os.path.join(dirname, fnames[3]), 'wb') as wT_file,
+              open(os.path.join(dirname, fnames[4]), 'wb') as t_file,
+              open(os.path.join(dirname, fnames[5]), 'wb') as i_file,
+              open(os.path.join(dirname, fnames[6]), 'wb') as m_file,
+              open(os.path.join(dirname, fnames[7]), 'wb') as wm_file, ):
             if self._flag_emergency_stop:
                 with self._LOCK:
                     self._estop_record()
