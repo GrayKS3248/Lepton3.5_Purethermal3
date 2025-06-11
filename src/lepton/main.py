@@ -70,5 +70,3 @@ def leprun(args=None):
         writer = Videowriter(rec_name=args.name)
         _ = writer.make_video()
         
-if __name__ == "__main__":
-    leprun()
