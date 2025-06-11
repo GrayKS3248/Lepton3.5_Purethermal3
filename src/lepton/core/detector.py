@@ -110,7 +110,7 @@ class Detector():
         # Apply 4 mean thresholding on L2 norm of temperature to detect
         # 1. Bulk cured material and background
         # 2. Bulk cured material boundaries
-        # 3. Cured material recently interacted with front
+        # 3. Cured material recently interacted with front and colder front
         # 4. Front candidate
         _, g_lab, g_cen = cv2.kmeans(fbg, 4, None, criteria, n_try, flags)
         g_cen = g_cen.flatten()
@@ -118,7 +118,8 @@ class Detector():
         
         # Get the candidate front mask based on only the gradient
         g_lab = g_lab.reshape((l,w))
-        g_mask = g_lab==sort_g_cen[3,1]
+        g_mask = np.logical_or(g_lab==sort_g_cen[2,1],
+                               g_lab==sort_g_cen[3,1])
         
         # If only one temperature image was provided, front estimate cannot
         # use derivative of temperature. Return intersection of temperature
@@ -144,10 +145,11 @@ class Detector():
         # Convert to float32
         fbdt = bdt.reshape((l*w,1)).astype(np.float32)
         
-        # Apply 2 means thresholding on delta temperature to detect
+        # Apply 3 means thresholding on delta temperature to detect
         # 1. Bulk cured material and background
-        # 2. Candidate front locations
-        _, dt_lab, dt_cen = cv2.kmeans(fbdt, 2, None, criteria, n_try, flags)
+        # 2. Low contrast candidate front locations
+        # 3. High contrast candidate front locations
+        _, dt_lab, dt_cen = cv2.kmeans(fbdt, 3, None, criteria, n_try, flags)
         dt_cen = dt_cen.flatten()
         sort_dt_cen = np.array(sorted(zip(dt_cen, np.arange(0, len(dt_cen)))))
         
@@ -160,7 +162,8 @@ class Detector():
             
         # Get the candidate front mask based on only delta temperature
         dt_lab = dt_lab.reshape((l,w))
-        dt_mask = dt_lab==sort_dt_cen[1,1]
+        dt_mask = np.logical_or(dt_lab==sort_dt_cen[1,1],
+                                dt_lab==sort_dt_cen[2,1])
         
         # The front mask is the intersection of all masks
         front_mask = np.logical_and(t_mask, g_mask)
