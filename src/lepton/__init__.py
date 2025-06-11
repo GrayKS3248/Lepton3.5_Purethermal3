@@ -19,4 +19,4 @@ from lepton.comm import (Host, # NOQA
 from lepton.main import leprun # NOQA
 
 
-__version__ = '0.3.b10'
+__version__ = '0.3.b11'
