@@ -63,6 +63,29 @@ def encode_msg(msg, typ):
         
     # Type cast
     data = data.astype(typ)
+    # try:
+    #     with np.errstate(all='raise'):
+    #         data = data.astype(typ)
+    # except:
+    #     data = data.astype(typ)
+    #     try:
+    #         print('-------------------')
+    #         print(msg)
+    #         print('-------------------')
+    #     except:
+    #         pass
+    #     try:
+    #         print('-------------------')
+    #         print(data)
+    #         print('-------------------')
+    #     except:
+    #         pass
+    #     try:
+    #         print('-------------------')
+    #         print(typ)
+    #         print('-------------------')
+    #     except:
+    #         pass
     
     # Replace any previous nans with typ min
     if np.any(nan_mask):
@@ -265,7 +288,7 @@ class Videowriter():
             return self._get_valid_name(rec_name)
 
     def _make_video(self, playback_speed):
-        frames = decode_recording_data()
+        frames = decode_recording_data(dirpath=self.DIR_PATH)
         
         print("Writing video... ", end='', flush=True)
         with av.open(self.REC_NAME, mode="w") as container:

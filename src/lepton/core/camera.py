@@ -10,7 +10,8 @@ from threading import Lock
 # Package modules
 from lepton.exceptions import (ImageShapeException,
                                BufferLengthException,
-                               TimeoutException,)
+                               TimeoutException,
+                               InvalidNameException)
 from lepton.misc.cmaps import Cmaps
 from lepton.misc.utilities import safe_run, ESC
 from lepton.core.detector import Detector
@@ -364,8 +365,8 @@ class Lepton():
         self.detector = Detector()
         
         # THREAD UNSAFE CLASS VARIABLES FOR HOMOGRAPHY TRANSFORM (DO NOT TOUCH)
-        self._focus_box_AR = 1.33333333
-        self._focus_box_size = 0.50
+        self._focus_box_AR = 1.36
+        self._focus_box_size = 0.95
         self._focus_box = [(), (), (), ()]
         self._subject_quad = [(np.nan,np.nan), (np.nan,np.nan), 
                              (np.nan,np.nan), (np.nan,np.nan)]
@@ -873,23 +874,34 @@ class Lepton():
         self._flag_recording = False
         print(ESC.OKCYAN+"Stopped."+ESC.ENDC, flush=True)
     
+    def _get_valid_name(self, dirname):       
+        if not os.path.exists(dirname): return dirname
+        
+        max_append = 999
+        for i in range(max_append):
+            valid_dirname = '{}_{:03}'.format(dirname, i+1)
+            if not os.path.exists(valid_dirname): return valid_dirname
+        
+        msg = "Could not make file name \"{}\" valid.".format(dirname)
+        raise InvalidNameException(msg, (dirname, max_append))
+    
     def _record(self, fps, detect_fronts, multiframe, equalize):
-        dirname = 'rec_data'
-        os.makedirs(dirname, exist_ok=True)
+        self.DIRPATH = self._get_valid_name('rec_data')
+        os.makedirs(self.DIRPATH, exist_ok=False)
         fnames = ['frame_number.dat', 'frame_time.dat', 
                   'temperature.dat', 'warped_temperature.dat',
                   'telem.dat', 'image.dat', 
                   'mask.dat', 'warped_mask.dat']
         
         with (Capture(self.PORT, fps, self.OVERLAY, self.DEBUG) as self.cap,
-              open(os.path.join(dirname, fnames[0]), 'wb') as fn_file,
-              open(os.path.join(dirname, fnames[1]), 'wb') as ft_file,
-              open(os.path.join(dirname, fnames[2]), 'wb') as T_file,
-              open(os.path.join(dirname, fnames[3]), 'wb') as wT_file,
-              open(os.path.join(dirname, fnames[4]), 'wb') as t_file,
-              open(os.path.join(dirname, fnames[5]), 'wb') as i_file,
-              open(os.path.join(dirname, fnames[6]), 'wb') as m_file,
-              open(os.path.join(dirname, fnames[7]), 'wb') as wm_file, ):
+              open(os.path.join(self.DIRPATH, fnames[0]), 'wb') as fn_file,
+              open(os.path.join(self.DIRPATH, fnames[1]), 'wb') as ft_file,
+              open(os.path.join(self.DIRPATH, fnames[2]), 'wb') as T_file,
+              open(os.path.join(self.DIRPATH, fnames[3]), 'wb') as wT_file,
+              open(os.path.join(self.DIRPATH, fnames[4]), 'wb') as t_file,
+              open(os.path.join(self.DIRPATH, fnames[5]), 'wb') as i_file,
+              open(os.path.join(self.DIRPATH, fnames[6]), 'wb') as m_file,
+              open(os.path.join(self.DIRPATH, fnames[7]), 'wb') as wm_file, ):
             if self._flag_emergency_stop:
                 with self._LOCK:
                     self._estop_record()

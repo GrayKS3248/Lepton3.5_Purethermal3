@@ -67,6 +67,6 @@ def leprun(args=None):
                                 detect_fronts=args.detect,
                                 multiframe=args.multiframe, 
                                 equalize=args.equalize)
-        writer = Videowriter(rec_name=args.name)
+        writer = Videowriter(rec_name=args.name, dirpath=lepton.DIRPATH)
         _ = writer.make_video()
         
