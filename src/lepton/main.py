@@ -24,7 +24,7 @@ def _parse_args():
                                  'white_hot'])
     parser.add_argument('-sf', "--scale-factor", 
                         help="the amount the captured image is scaled by",
-                        type=int, default=3)
+                        type=int, default=4)
     parser.add_argument('-eq', "--equalize", 
                         help="apply histogram equalization to image", 
                         action=argparse.BooleanOptionalAction, default=True)

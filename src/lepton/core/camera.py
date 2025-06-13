@@ -596,9 +596,8 @@ class Lepton():
         warped_image = cv2.warpPerspective(image, self._homography, shp)
         return self._draw_focus_box(warped_image, quad_incomplete), True
     
-    def _uptime_str(self):
-        telemetry = self._telemetry_buffer[-1]
-        hrs = telemetry['Uptime (ms)']/3600000.0
+    def _time_2_hmsms(self, time_ms):
+        hrs = time_ms/3600000.0
         mns = 60.0*(hrs-np.floor(hrs))
         scs = 60.0*(mns-np.floor(mns))
         mss = 1000.0*(scs - np.floor(scs))
@@ -606,26 +605,28 @@ class Lepton():
         mns = int(np.floor(mns))
         scs = int(np.floor(scs))
         mss = int(np.floor(mss))
-        return "{:02d}:{:02d}:{:02d}:{:03d}".format(hrs,mns,scs,mss)
+        return hrs, mns, scs, mss
+        
+    def _ffc_uptime_str(self):
+        telemetry = self._telemetry_buffer[-1]
+        d_time = telemetry['Uptime (ms)']-telemetry['Uptime at last FFC (ms)']
+        _, mns, scs, _ =  self._time_2_hmsms(d_time)
+        return "{:01d}:{:02d}".format(mns, scs)
+    
+    def _uptime_str(self):
+        telemetry = self._telemetry_buffer[-1]
+        hrs, mns, scs, mss =  self._time_2_hmsms(telemetry['Uptime (ms)'])
+        return"{:02d}:{:02d}:{:02d}.{:03d}".format(hrs, mns, scs, mss)
+    
+    def _time_str(self):
+        return "{} | {}".format(self._uptime_str(), self._ffc_uptime_str())
     
     def _temperature_range_str(self):
         telemetry = self._telemetry_buffer[-1]
-        mn = '({:0>6.2f})'.format(telemetry['Frame temperature min (C)'])
-        i=1
-        while mn[i]=='0' and mn[i+1]!='.':
-            mn=' {}{}'.format(mn[:i], mn[i+1:])
-            i+=1
-        me = '| {:0>6.2f} |'.format(telemetry['Frame temperature mean (C)'])
-        i=2
-        while me[i]=='0' and me[i+1]!='.':
-            me=' {}{}'.format(me[:i], me[i+1:])
-            i+=1
-        mx = '({:0>6.2f})'.format(telemetry['Frame temperature max (C)'])
-        i=1
-        while mx[i]=='0' and mx[i+1]!='.':
-            mx=' {}{}'.format(mx[:i], mx[i+1:])
-            i+=1
-        return "{} {} {} C".format(mn, me, mx)
+        mn = telemetry['Frame temperature min (C)']
+        me = telemetry['Frame temperature mean (C)']
+        mx = telemetry['Frame temperature max (C)']
+        return "{:>6.2f} | {:>6.2f} | {:>6.2f} C".format(mn, me, mx)
     
     def _fps_str(self):
         if len(self._telemetry_buffer)<self.BUFFER_SIZE:
@@ -639,20 +640,29 @@ class Lepton():
             delta = 0.0
         else:
             delta = np.mean(np.diff(frame_times))*0.001
-        if delta <= 0.0: return 'FPS: ---'
-        return 'FPS: {:.2f}'.format(1.0/delta)
+        if delta <= 0.0: return '---'
+        return '{:.2f}'.format(1.0/delta)
             
     def _telemetrize_image(self, image):
         shp = (image.shape[0]+30,image.shape[1],image.shape[2])
         telimg = np.zeros(shp).astype(np.uint8)
         telimg[:-30,:,:] = image
         
-        uptime_pos = (int(np.round(telimg.shape[1]/64)), telimg.shape[0]-10)
-        range_pos = (telimg.shape[1]-255, telimg.shape[0]-10)
-        fps_pos = (int(np.round(0.5*(range_pos[0]+uptime_pos[0])))+20, 
-                   telimg.shape[0]-10)
+        time_str = self._time_str()
+        rng_str = self._temperature_range_str()
+        fps_str = self._fps_str()
         
-        telimg = cv2.putText(telimg, self._uptime_str(), uptime_pos, 
+        (tw,_), _ = cv2.getTextSize(time_str, cv2.FONT_HERSHEY_PLAIN, 1, 1)
+        (fw,_), _ = cv2.getTextSize(fps_str, cv2.FONT_HERSHEY_PLAIN, 1, 1)
+        (rw,_), _ = cv2.getTextSize(rng_str, cv2.FONT_HERSHEY_PLAIN, 1, 1)
+        L = telimg.shape[1]
+        s = int(np.round(0.5*(L-2.0-tw-rw-fw)))
+        s = 0 if s < 0 else s
+        uptime_pos = (1, telimg.shape[0]-10)
+        fps_pos = (1+tw+s, telimg.shape[0]-10)
+        range_pos = (1+tw+fw+2*s, telimg.shape[0]-10)
+        
+        telimg = cv2.putText(telimg, self._time_str(), uptime_pos, 
                              cv2.FONT_HERSHEY_PLAIN , 1, (255,255,255), 1, 
                              cv2.LINE_AA)
         telimg = cv2.putText(telimg, self._temperature_range_str(), range_pos, 
@@ -663,8 +673,8 @@ class Lepton():
                              cv2.LINE_AA)
         
         if self._telemetry_buffer[-1]['FFC state']=='imminent':
-            telimg = cv2.rectangle(telimg,(5,5),(35,25),[0,0,0],-1)
-            telimg = cv2.putText(telimg, "FFC", (6,21),
+            telimg = cv2.rectangle(telimg,(5,5),(43,25),[0,0,0],-1)
+            telimg = cv2.putText(telimg, "FFC", (10,21),
                                 cv2.FONT_HERSHEY_PLAIN , 1, (255,255,255), 1,
                                 cv2.LINE_AA)
         return telimg
