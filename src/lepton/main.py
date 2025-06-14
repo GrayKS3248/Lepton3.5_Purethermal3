@@ -1,6 +1,7 @@
 # Std modules
 import argparse
 import sys
+import os
 
 # Package modules
 from lepton import ESC
@@ -14,6 +15,8 @@ def _parse_args():
                         type=int, default=0)
     parser.add_argument('-r', "--record", help="record data stream", 
                         action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument('-dp', "--dirpath", help="path to the save dir", 
+                        type=str, default="")
     parser.add_argument('-n', "--name", help="name of saved video file", 
                         type=str, default="recording")
     parser.add_argument('-c', "--cmap", help="colormap used in viewer", 
@@ -66,7 +69,8 @@ def leprun(args=None):
         _ = lepton.start_record(fps=args.fps,
                                 detect_fronts=args.detect,
                                 multiframe=args.multiframe, 
-                                equalize=args.equalize)
+                                equalize=args.equalize,
+                                dirpath=args.dirpath)
         writer = Videowriter(rec_name=args.name, dirpath=lepton.DIRPATH)
         _ = writer.make_video()
         

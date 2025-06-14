@@ -238,7 +238,8 @@ def decode_recording_data(dirpath='rec_data',
 class Videowriter():
     def __init__(self, rec_name='recording', dirpath='rec_data', 
                  telemetry_file='telem.json', image_file='image.dat'):
-        self.REC_NAME = self._get_valid_name(rec_name)
+        parent_dir = os.path.split(dirpath)[0]
+        self.REC_NAME = self._get_valid_name(os.path.join(parent_dir,rec_name))
         self.DIR_PATH = dirpath
         self.TELEMETRY_FILE = telemetry_file
         self.IMAGE_FILE = image_file
@@ -252,7 +253,7 @@ class Videowriter():
             return cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED)
     
     def _get_valid_name_(self, rec_name):
-        illegal_chars = ("\\", "/", "<", ">", ":", "|", "?", "*", ".")
+        illegal_chars = ("<", ">", ":", "|", "?", "*", ".")
         if any(illegal_char in rec_name for illegal_char in illegal_chars):
             msg = "Could not make file name \"{}\" valid. (Illegal characters)"
             msg = msg.format(rec_name)

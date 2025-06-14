@@ -622,10 +622,11 @@ class Lepton():
         return "{} | {}".format(self._uptime_str(), self._ffc_uptime_str())
     
     def _temperature_range_str(self):
-        telemetry = self._telemetry_buffer[-1]
-        mn = telemetry['Frame temperature min (C)']
-        me = telemetry['Frame temperature mean (C)']
-        mx = telemetry['Frame temperature max (C)']
+        temperature_C = self._temperature_C_buffer[-1]
+        warped_temperature_C = self._warp_element(temperature_C)
+        mn = np.min(warped_temperature_C)
+        me = np.mean(warped_temperature_C)
+        mx = np.max(warped_temperature_C)
         return "{:>6.2f} | {:>6.2f} | {:>6.2f} C".format(mn, me, mx)
     
     def _fps_str(self):
@@ -895,8 +896,12 @@ class Lepton():
         msg = "Could not make file name \"{}\" valid.".format(dirname)
         raise InvalidNameException(msg, (dirname, max_append))
     
-    def _record(self, fps, detect_fronts, multiframe, equalize):
-        self.DIRPATH = self._get_valid_name('rec_data')
+    def _record(self, fps, detect_fronts, multiframe, equalize, dirpath):
+        if dirpath is None:
+            dirname =  'rec_data'
+        else:
+            dirname = os.path.join(dirpath, 'rec_data')
+        self.DIRPATH = self._get_valid_name(dirname)
         os.makedirs(self.DIRPATH, exist_ok=False)
         fnames = ['frame_number.dat', 'frame_time.dat', 
                   'temperature.dat', 'warped_temperature.dat',
@@ -1024,9 +1029,10 @@ class Lepton():
         return res[0]
 
     def start_record(self, fps=None, detect_fronts=False, multiframe=True, 
-                     equalize=False):
+                     equalize=False, dirpath=None):
         res = safe_run(self._record, self._estop_record, 
-                       args=(fps, detect_fronts, multiframe, equalize))
+                       args=(fps, detect_fronts, 
+                             multiframe, equalize, dirpath))
         if res[0] < 0:
             time.sleep(1.0) # Wait for other tasks out of thread
             print(ESC.header(''.join(['-']*60)), flush=True)
