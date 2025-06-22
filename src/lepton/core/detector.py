@@ -44,7 +44,7 @@ class Detector():
         Parameters
         ----------
         temperature : list of array of floats, shape( (m,n) )
-            Temperature image in Celcius.
+            Time ordered temperature images in Celcius.
         n_iter : int, optional
             Stop the kmeans algorithm after the specified number of iterations,
             n_iter. The default is 12.
