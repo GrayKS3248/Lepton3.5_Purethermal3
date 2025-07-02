@@ -365,8 +365,8 @@ class Lepton():
         self.detector = Detector()
         
         # THREAD UNSAFE CLASS VARIABLES FOR HOMOGRAPHY TRANSFORM (DO NOT TOUCH)
-        self._focus_box_AR = 1.36
-        self._focus_box_size = 0.95
+        self._focus_box_AR = 1.74
+        self._focus_box_size = 0.76
         self._focus_box = [(), (), (), ()]
         self._subject_quad = [(np.nan,np.nan), (np.nan,np.nan), 
                              (np.nan,np.nan), (np.nan,np.nan)]
