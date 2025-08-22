@@ -126,7 +126,7 @@ class Detector():
         gT_cen = sorted(range(len(gT_cen)), key=lambda k: gT_cen[k])
         
         # Get the candidate front mask based on only the gradient
-        gT_mask = (gT_lab==gT_cen[2]) | (gT_lab==gT_cen[3])
+        gT_mask = (gT_lab==gT_cen[3]) | (gT_lab==gT_cen[2])
         
         # If only one temperature image was provided, front estimate cannot
         # use derivative of temperature. Return intersection of temperature
@@ -136,8 +136,9 @@ class Detector():
 
         # Calculate the blurred temporal differential of the temperature
         # image sequence by spatiotemporal gaussian differentiation
-        bdT = -gaussian_filter(temperatures, (2,2,3,), order=(0,0,1), 
-                               mode='nearest')[-1]
+        bdT = gaussian_filter(temperatures, 
+                              0.15*min(blur_size)+0.35, 
+                              order=(1,0,0), mode='nearest')[-1]
         
         # Isolate regions that got hotter. The front won't get colder.
         bdT[bdT<0.0]=0.0
@@ -157,7 +158,7 @@ class Detector():
         dT_cen = sorted(range(len(dT_cen)), key=lambda k: dT_cen[k])
             
         # Get the candidate front mask based on only delta temperature
-        dT_mask = (dT_lab==dT_cen[1]) | (dT_lab==dT_cen[2])
+        dT_mask = (dT_lab==dT_cen[2]) | (dT_lab==dT_cen[1])
         
         # Determine if the dT mask is an outlier by FToA comparison
         return T_mask & gT_mask & dT_mask
@@ -329,32 +330,14 @@ def make(d, sd, ns, c=(None, None)):
     plt.close()
     return T0, T0m
 if __name__ == "__main__":
-    d = r'C:/Users/Grayson/Docs/Repos/FP_Feeback_Control/Experimental Dataset/Images/Raw'
-    
-    sd = 'Rec-0223'
-    ns = ['frame_02650.png', 'frame_02660.png', 'frame_02770.png']
-    T0, T0m = make(d, sd, ns, c=((56,-56),(112,-192)))
+    d = r"D:\OneDrive - University of Illinois - Urbana\Graduate\Thesis\Data\FP Feedback Control\Front Detection Dataset"
     
     sd = 'Rec-0175'
     ns = ['frame_02970.png', 'frame_02980.png', 'frame_02990.png']
-    T1, T1m = make(d, sd, ns, c=((56,-56),(112,-192)))
+    T, Tm = make(d, sd, ns, c=((150,-10),None))
     
-    sd = 'Long Fiber Tow Center Edge'
-    ns = ['frame_03000.png', 'frame_03010.png', 'frame_03020.png']
-    T2, T2m = make(d, sd, ns, c=((56,-56),(112,-192)))
-
-    
-    d = r'C:\Users\Grayson\Docs\Repos\FP_Feedback_Control_Hardware'
-    sd = ''
-    ns = ['0.png', '1.png', '2.png']
-    T3, T3m = make(d, sd, ns, c=(None,(250,-149)))
-    
-    T0m = cv2.cvtColor(np.round(T0m*255).astype(np.uint8), cv2.COLOR_BGR2RGB)
-    T1m = cv2.cvtColor(np.round(T1m*255).astype(np.uint8), cv2.COLOR_BGR2RGB)
-    T2m = cv2.cvtColor(np.round(T2m*255).astype(np.uint8), cv2.COLOR_BGR2RGB)
-    T3m = cv2.cvtColor(np.round(T3m*255).astype(np.uint8), cv2.COLOR_BGR2RGB)
-    cv2.imwrite(os.path.join(d,'T0.png'), T0m)
-    cv2.imwrite(os.path.join(d,'T1.png'), T1m)
-    cv2.imwrite(os.path.join(d,'T2.png'), T2m)
-    cv2.imwrite(os.path.join(d,'T3.png'), T3m)
+    T = cv2.cvtColor(np.round(T*255).astype(np.uint8), cv2.COLOR_BGR2RGB)
+    Tm = cv2.cvtColor(np.round(Tm*255).astype(np.uint8), cv2.COLOR_BGR2RGB)
+    cv2.imwrite(os.path.join(d,'_T.png'), T)
+    cv2.imwrite(os.path.join(d,'_Tm.png'), Tm)
     
