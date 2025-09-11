@@ -126,7 +126,7 @@ class Detector():
         gT_cen = sorted(range(len(gT_cen)), key=lambda k: gT_cen[k])
         
         # Get the candidate front mask based on only the gradient
-        gT_mask = (gT_lab==gT_cen[3]) | (gT_lab==gT_cen[2])
+        gT_mask = (gT_lab==gT_cen[2]) | (gT_lab==gT_cen[3])
         
         # If only one temperature image was provided, front estimate cannot
         # use derivative of temperature. Return intersection of temperature
@@ -151,14 +151,14 @@ class Detector():
         # 1. Bulk cured material and background
         # 2. Low contrast candidate front locations
         # 3. High contrast candidate front locations
-        _, dT_lab, dT_cen = cv2.kmeans(fbdT,3,None,
+        _, dT_lab, dT_cen = cv2.kmeans(fbdT,4,None,
                                        self.criteria,n_try,self.flags)
         dT_lab = dT_lab.reshape(T_shape)
         dT_cen = dT_cen.flatten()
         dT_cen = sorted(range(len(dT_cen)), key=lambda k: dT_cen[k])
             
         # Get the candidate front mask based on only delta temperature
-        dT_mask = (dT_lab==dT_cen[2]) | (dT_lab==dT_cen[1])
+        dT_mask = (dT_lab==dT_cen[2]) | (dT_lab==dT_cen[3])
         
         # Determine if the dT mask is an outlier by FToA comparison
         return T_mask & gT_mask & dT_mask
@@ -300,44 +300,4 @@ class Detector():
         
         # Return the detected front instances
         return front_mask
-    
-    
-import os
-import matplotlib.pyplot as plt
-from matplotlib import colormaps as cmap
-def make(d, sd, ns, c=(None, None)):
-    
-    if c[0] is None and c[1] is None:
-        T = [cv2.imread(os.path.join(d,sd,n))[:,:,0]*0.7059+20 
-             for n in ns]
-    elif c[0] is None and not c[1] is None:
-        T = [cv2.imread(os.path.join(d,sd,n))[:,c[1][0]:c[1][1],0]*0.7059+20 
-             for n in ns]
-    elif not c[0] is None and c[1] is None:
-        T = [cv2.imread(os.path.join(d,sd,n))[c[0][0]:c[0][1],:,0]*0.7059+20 
-             for n in ns]
-    else:
-        T = [cv2.imread(os.path.join(d,sd,n))[c[0][0]:c[0][1],
-                                              c[1][0]:c[1][1],0]*0.7059+20 
-             for n in ns]
-    m = Detector()._kmeans(T)
-    T0 = cmap['inferno'](np.clip(np.round((T[-1]-20)*1.4166),0,255)/255)
-    T0m = T0.copy()
-    T0m[m] = [0., 1., 0., 1.]
-    plt.imshow(T0m)
-    plt.show()
-    plt.clf()
-    plt.close()
-    return T0, T0m
-if __name__ == "__main__":
-    d = r"D:\OneDrive - University of Illinois - Urbana\Graduate\Thesis\Data\FP Feedback Control\Front Detection Dataset"
-    
-    sd = 'Rec-0175'
-    ns = ['frame_02970.png', 'frame_02980.png', 'frame_02990.png']
-    T, Tm = make(d, sd, ns, c=((150,-10),None))
-    
-    T = cv2.cvtColor(np.round(T*255).astype(np.uint8), cv2.COLOR_BGR2RGB)
-    Tm = cv2.cvtColor(np.round(Tm*255).astype(np.uint8), cv2.COLOR_BGR2RGB)
-    cv2.imwrite(os.path.join(d,'_T.png'), T)
-    cv2.imwrite(os.path.join(d,'_Tm.png'), Tm)
     
