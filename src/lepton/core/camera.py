@@ -14,7 +14,7 @@ from lepton.exceptions import (ImageShapeException,
                                InvalidNameException)
 from lepton.misc.cmaps import Cmaps
 from lepton.misc.utilities import safe_run, ESC
-from lepton.core.detector import Detector
+from lepton.core.detector import detect
 from lepton.core.record import encode_frame_data
 
 # External modules
@@ -25,8 +25,8 @@ from scipy.signal import find_peaks
 
 class Capture():
     def __init__(self, port=0, target_fps=None, overlay=False, debug=False):
-        self.DEBUG = debug
-        if self.DEBUG:
+        self._debug = debug
+        if self._debug:
             target_fps = 9.0
             self.uptime_ms = 0
             self.frm_ct = 0
@@ -87,7 +87,7 @@ class Capture():
             self.TARGET_DT = 1.0 / target_fps
         except:
             self.TARGET_DT = None
-        
+
         self.FLAG_OVERLAY = overlay
         if self.FLAG_OVERLAY:
             parent = os.path.dirname(os.path.realpath(__file__))
@@ -102,36 +102,33 @@ class Capture():
             self.OVERLAY_FRMS = self.OVERLAY_FRMS.reshape(shape)
             self.OVERLAY_LEN = len(self.OVERLAY_FRMS[0,0,:])
             self.overlay_n = 0
-            
+
         self.prev_frame_time = self._time()
-        
-    def __del__(self):
-        if self.DEBUG: return
-        self.cap.release()
-    
+
     def __enter__(self):
-        if self.DEBUG: return self
+        if self._debug:
+            return self
         self.cap = cv2.VideoCapture(self.PORT + cv2.CAP_DSHOW)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.IMAGE_SHP[0])
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.IMAGE_SHP[1]+2)
         self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"Y16 "))
         self.cap.set(cv2.CAP_PROP_CONVERT_RGB, 0)
         return self
-    
+
     def __exit__(self, exc_type, exc_value, traceback):
-        if self.DEBUG: return
-        self.cap.release()
-    
+        if not self._debug:
+            self.cap.release()
+
     def _time(self):
         return cv2.getTickCount()/cv2.getTickFrequency()
-        
+
     def _wait_4_frametime(self):
-        try: 
-            while True:
-                if (self._time()-self.prev_frame_time)>=self.TARGET_DT: return
+        try:
+            while (self._time() - self.prev_frame_time) >= self.TARGET_DT:
+                time.sleep(0.001)
         except:
             return
-    
+
     def _overlay(self, img):
         overlay_img = -1*np.ones((160,122))
         foreground = self.OVERLAY_FRMS[:,:,self.overlay_n]
@@ -163,7 +160,7 @@ class Capture():
                                       borderValue=-1)
         overlay_mask = overlay_img < 0
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3))
-        overlay_mask = cv2.dilate(overlay_mask.astype(np.uint8), 
+        overlay_mask = cv2.dilate(overlay_mask.astype(np.uint8),
                                   kernel, iterations=4)
         overlay_mask = np.logical_not(overlay_mask)
         overlay_mask = overlay_mask.astype(bool)
@@ -172,11 +169,11 @@ class Capture():
         img[overlay_mask] = overlay_img[overlay_mask]
         self.overlay_n = (self.overlay_n + 1) % self.OVERLAY_LEN
         return img
-    
+
     def _decode_data(self, raw_data):
         temp_C = raw_data[:-2] * 0.01 - 273.15
-        
-        if self.DEBUG:
+
+        if self._debug:
             mn = float(round(np.min(temp_C),2))
             me = float(round(np.mean(temp_C),2))
             mx = float(round(np.max(temp_C),2))
@@ -186,29 +183,29 @@ class Capture():
             self.telemetry['Frame temperature mean (C)'] = me
             self.telemetry['Frame temperature max (C)'] = mx
             return (temp_C, copy(self.telemetry), )
-        
+
         row_A = raw_data[-2,:80]
         row_B = raw_data[-2,80:]
         row_C = raw_data[-1,:80]
         adat=struct.unpack("<bbII16c8B6xI5H4xHIH2x6H64xIH10x", row_A)
         bdat=struct.unpack("<38x8H106x", row_B)
         cdat=struct.unpack("<10x5H8xHH12x4H44x?x9H44x", row_C)
-        
+
         status = ['', ]*5
         if adat[3] & 8 == 0: status[0] = "not desired"
         elif adat[3] & 8 == 8: status[0] = "desired"
-        
+
         if adat[3] & 48 == 0: status[1] = "never commanded"
         elif adat[3] & 48 == 16: status[1] = "imminent"
         elif adat[3] & 48 == 32: status[1] = "in progress"
         elif adat[3] & 48 == 48: status[1] = "complete"
-        
+
         if adat[3] & 4096 == 0: status[2] = "disabled"
         elif adat[3] & 4096 == 4096: status[2] = "enabled"
-        
+
         if adat[3] & 32768 == 0: status[3] = "not locked out"
         elif adat[3] & 32768 == 32768: status[3] = "locked out"
-        
+
         if adat[3] & 1048576 == 0: status[4] = "not imminent"
         elif adat[3] & 1048576 == 1048576: status[4] = "within 10s"
 
@@ -216,26 +213,26 @@ class Capture():
 
         gpp_version = '{}.{}.{}'.format(adat[20],adat[21],adat[22])
         dsp_version = '{}.{}.{}'.format(adat[24],adat[25],adat[26])
-        
+
         video_format = ''
         if adat[43] == 3: video_format = 'RGB888'
         elif adat[43] == 7: video_format = 'RAW14'
-        
+
         gain_mode = ''
         if cdat[0] == 0: gain_mode = 'high'
         elif cdat[0] == 1: gain_mode = 'low'
         elif cdat[0] == 2: gain_mode = 'auto'
-        
+
         eff_gain_mode = ''
         if cdat[1] == 0: eff_gain_mode = 'high'
         elif cdat[1] == 1: eff_gain_mode = 'low'
         if cdat[0] != 2: eff_gain_mode = 'not in auto mode'
-        
+
         desired_gain_mode = ''
         if cdat[2] == 0: desired_gain_mode = gain_mode
         elif cdat[2] == 1 and cdat[0] == 0: desired_gain_mode = 'low'
         elif cdat[2] == 1 and cdat[0] == 1: desired_gain_mode = 'high'
-        
+
         telemetry = {
             'Telemetry version':'{}.{}'.format(adat[0], adat[1]),
             'Uptime (ms)':adat[2],
@@ -288,9 +285,10 @@ class Capture():
             'Spotmeter population (px)':cdat[16],
             'Spotmeter ROI (top left bottom right)':cdat[17:],}
         return (temp_C, telemetry, )
-    
+
     def reacquire(self):
-        if self.DEBUG: return
+        if self._debug:
+            return
         self.cap.release()
         time.sleep(5.0) # Wait to require for camera reboot
         self.cap = cv2.VideoCapture(self.PORT + cv2.CAP_DSHOW)
@@ -298,25 +296,25 @@ class Capture():
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.IMAGE_SHP[1]+2)
         self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"Y16 "))
         self.cap.set(cv2.CAP_PROP_CONVERT_RGB, 0)
-    
+
     def read(self):
-        if self.DEBUG: 
+        if self._debug:
             self._wait_4_frametime()
             res = True
-            im = (np.random.rand(self.IMAGE_SHP[1]+2,
-                             self.IMAGE_SHP[0])*500+29065).astype(np.uint16)
-            self.uptime_ms += int(1000.*(self._time()-self.prev_frame_time))
+            im = np.random.rand(self.IMAGE_SHP[1]+2, self.IMAGE_SHP[0])
+            im = (im * 500 + 29065).astype(np.uint16)
+            self.uptime_ms += int(1000. * (self._time() - self.prev_frame_time))
             self.frm_ct += 1
         else:
             self._wait_4_frametime()
             res, im = self.cap.read()
         self.prev_frame_time = self._time()
-        
+
         if not res:
             return (False, None, None, )
-        
-        if im.shape[0]!=self.IMAGE_SHP[1]+2 or im.shape[1]!=self.IMAGE_SHP[0]:
-            shp = (im.shape[0]-2,im.shape[1])
+
+        if im.shape[0] != self.IMAGE_SHP[1] + 2 or im.shape[1] != self.IMAGE_SHP[0]:
+            shp = (im.shape[0]-2, im.shape[1])
             msg = ("Captured image shape {} does not equal "
                    "expected image shape {}. Are you sure the selected "
                    "port is correct? NOTE: If captured image shape is "
@@ -324,16 +322,16 @@ class Capture():
                    "should reseat its socket.")
             msg = msg.format(shp, self.IMAGE_SHP)
             raise ImageShapeException(msg, payload=(shp, self.IMAGE_SHP))
-        
+
         if self.FLAG_OVERLAY:
             im = self._overlay(im)
-        
+
         return (True, ) + self._decode_data(im)
 
 
 class Lepton():
-    def __init__(self, camera_port, cmap, scale_factor, overlay, debug):
-        # CONSTANTS (DO NOT TOUCH)
+    def __init__(self, camera_port=0, cmap='ironbow', scale_factor=5, overlay=False, debug=False):
+        # CONSTANTS
         self.PORT = camera_port
         self.CMAP = Cmaps[cmap]
         self.SHOW_SCALE = scale_factor
@@ -342,7 +340,7 @@ class Lepton():
         self.BUFFER_SIZE = 5
         self.WINDOW_NAME = 'Lepton 3.5 on Purethermal 3'
         self._LOCK = Lock()
-        
+
         # THREAD SAFE BUFFERS (INTERACT ONLY THROUGH PUBLIC FUNCTIONS)
         self._frame_number_buffer = deque()
         self._frame_time_buffer = deque()
@@ -350,32 +348,29 @@ class Lepton():
         self._telemetry_buffer = deque()
         self._image_buffer = deque()
         self._mask_buffer = deque()
-        
+
         # THREAD SAFE INTERNAL FLAGS (INTERACT ONLY THROUGH PUBLIC FUNCTIONS)
         self._flag_streaming = False
         self._flag_recording = False
         self._flag_emergency_stop = False
-        
+
         # THREAD UNSAFE INTERNAL FLAGS (DO NOT TOUCH)
         self._flag_focus_box = False
         self._flag_modding_AR = True
         self._flag_modding_fast = False
-        
-        # FRONT DETECTOR
-        self.detector = Detector()
-        
+
         # THREAD UNSAFE CLASS VARIABLES FOR HOMOGRAPHY TRANSFORM (DO NOT TOUCH)
         self._focus_box_AR = 1.74
         self._focus_box_size = 0.76
         self._focus_box = [(), (), (), ()]
-        self._subject_quad = [(np.nan,np.nan), (np.nan,np.nan), 
+        self._subject_quad = [(np.nan,np.nan), (np.nan,np.nan),
                              (np.nan,np.nan), (np.nan,np.nan)]
         self._subject_next_vert = (np.nan,np.nan)
         self._homography = None
         self._scaled_homography = None
         self._inv_homography = None
         self._inv_scaled_homography = None
-        
+
         # THREAD UNSAFE CLASS VARIABLES FOR FRAME TRACKING (DO NOT TOUCH)
         self._wall_epoch = np.nan
         self._frame_count = np.nan
@@ -383,10 +378,10 @@ class Lepton():
 
     def _mouse_callback(self, event, x, y, flags, param):
         if not self._flag_focus_box: return
-        
+
         if event == cv2.EVENT_MBUTTONDOWN and self._homography is None:
             self._flag_modding_fast = not self._flag_modding_fast
-        
+
         if event == cv2.EVENT_MOUSEWHEEL and self._homography is None:
             rate = (0.1 if self._flag_modding_fast else 0.01)
             if flags > 0:
@@ -400,34 +395,34 @@ class Lepton():
                 else:
                     self._focus_box_size -= rate
             self._focus_box_size = np.clip(self._focus_box_size, 0.01, 1.0)
-            self._focus_box_AR = np.clip(self._focus_box_AR, 0.01, 
+            self._focus_box_AR = np.clip(self._focus_box_AR, 0.01,
                                         min(4./(3.*self._focus_box_size),9.99))
 
         if event == cv2.EVENT_RBUTTONDOWN and self._homography is None:
             self._flag_modding_AR = not self._flag_modding_AR
-                
+
         if event == cv2.EVENT_LBUTTONDOWN:
             if (np.nan, np.nan) in self._subject_quad:
                 insert_at = self._subject_quad.index((np.nan, np.nan))
                 self._subject_quad[insert_at] = (x,y)
-            
+
         if event == cv2.EVENT_MOUSEMOVE:
             self._subject_next_vert = np.array([x,y])
-    
+
     def _warp_element(self, element):
         is_warped = self._flag_focus_box and not self._homography is None
-        
+
         if element is None or not is_warped:
             return copy(element)
-        
+
         typ = element.dtype
         if typ==bool:
-            warped = cv2.warpPerspective(element.astype(np.uint8), 
+            warped = cv2.warpPerspective(element.astype(np.uint8),
                                          self._scaled_homography,
                                          (160, 120))
         else:
             warped = cv2.warpPerspective(element,
-                                         self._scaled_homography, 
+                                         self._scaled_homography,
                                          (160, 120))
         (l,t), (r,b) = self._focus_box[0], self._focus_box[2]
         l = int(np.round(l/self.SHOW_SCALE))
@@ -436,7 +431,7 @@ class Lepton():
         b = int(np.round(b/self.SHOW_SCALE))
         warped = warped[t:b+1,l:r+1].astype(typ)
         return warped
-    
+
     def _warp_deque(self, buffer, n):
         buffer_len = len(buffer)
         warped_buffer = []
@@ -446,12 +441,12 @@ class Lepton():
             warped_buffer.append(warped_element)
         warped_buffer.reverse()
         return warped_buffer
-    
-    def _dewarp_element(self, element, thresh=0.25):
-        if (element is None or 
+
+    def _dewarp_element(self, element):
+        if (element is None or
             not self._flag_focus_box or self._inv_homography is None):
             return copy(element)
-        
+
         (l,t), (r,b) = self._focus_box[0], self._focus_box[2]
         l = int(np.round(l/self.SHOW_SCALE))
         t = int(np.round(t/self.SHOW_SCALE))
@@ -468,19 +463,19 @@ class Lepton():
                                        self._inv_scaled_homography,
                                        (160, 120)).astype(typ)
         return dewarped
-    
+
     def _detect_front(self, detect_fronts, multiframe):
         if not detect_fronts or len(self._temperature_C_buffer)==0:
             self._mask_buffer.append(None)
             return
-        
+
         if multiframe:
             temps = self._warp_deque(self._temperature_C_buffer, n=3)
         else:
             temps = [self._warp_element(self._temperature_C_buffer[-1])]
-        mask = self.detector.front(temps, 'kmeans')
+        mask = detect(temps)
         self._mask_buffer.append(self._dewarp_element(mask))
-    
+
     def _normalize_temperature(self, temperature_C, alpha=0.0, beta=1.0,
                                equalize=True):
         mn = np.min(temperature_C)
@@ -489,7 +484,7 @@ class Lepton():
         if rn==0.0: return np.zeros(temperature_C.shape)
         norm = (temperature_C-mn) * ((beta-alpha)/(mx-mn)) + alpha
         if not equalize: return norm
-        
+
         quantized = np.round(norm*255).astype(np.uint8)
         hist = cv2.calcHist([quantized.flatten()],[0],None,[256],[0,256])
         P = (hist / 19200.0).flatten()
@@ -513,19 +508,19 @@ class Lepton():
                                             equalize=equalize)
         image = np.round(255.*self.CMAP(image)[:,:,:-1]).astype(np.uint8)
         self._image_buffer.append(image)
-    
+
     def _draw_subject_quad(self, image):
         lines = []
         for i in range(4):
             j = (i+1) % 4
             lines.append([self._subject_quad[i], self._subject_quad[j]])
         lines = np.array(lines)
-        
+
         next_vert_at = np.all(np.isnan(lines[:,1,:]),axis=1)
         if any(next_vert_at):
             next_vert_at = np.argmax(next_vert_at)
             lines[next_vert_at,1,:] = self._subject_next_vert
-        
+
         roi_image = copy(image)
         for i, line in enumerate(lines):
             if np.any(np.isnan(line)) and i!=3: break
@@ -535,12 +530,12 @@ class Lepton():
                 srt = np.round(line[0]).astype(int)
             end = np.round(line[1]).astype(int)
             if all(srt==end): continue
-            roi_image = cv2.line(roi_image, srt, end, (255,0,255), 1) 
-            
+            roi_image = cv2.line(roi_image, srt, end, (255,0,255), 1)
+
         return roi_image
-    
+
     def _draw_focus_box(self, image, quad_incomplete):
-        img_h, img_w = image.shape[0], image.shape[1] 
+        img_h, img_w = image.shape[0], image.shape[1]
         box_h = int(np.round(self._focus_box_size*img_h))
         box_w = int(np.round(self._focus_box_AR*box_h))
         l = int(0.5*(img_w - box_w))
@@ -548,18 +543,18 @@ class Lepton():
         r = l + box_w - 1
         b = t + box_h - 1
         self._focus_box = [(l,t),(l,b),(r,b),(r,t)]
-        
+
         color = [0,255,255] if quad_incomplete else [255,0,255]
         fb_image = cv2.rectangle(image, self._focus_box[0], self._focus_box[2],
                                  color, 1)
         if not quad_incomplete: return fb_image
-        
+
         cnr=[i for i,s in enumerate(self._subject_quad) if s!=(np.nan, np.nan)]
         cnr = len(cnr)
         if cnr < 4:
-            fb_image = cv2.circle(fb_image, self._focus_box[cnr], 
+            fb_image = cv2.circle(fb_image, self._focus_box[cnr],
                                   3, [255,0,255], -1)
-        
+
         if self._flag_modding_AR:
             txt = 'AR: {:.2f}'.format(self._focus_box_AR)
             fb_image = cv2.rectangle(fb_image,(l+2,t+2),(l+75,t+15),[0,0,0],-1)
@@ -569,17 +564,17 @@ class Lepton():
         fb_image = cv2.putText(fb_image, txt, (l+4,t+14),
                                cv2.FONT_HERSHEY_PLAIN , 1, (255,255,255), 1,
                                cv2.LINE_AA)
-        
+
         return fb_image
-    
+
     def _get_focus_box(self, image):
         if not self._flag_focus_box: return image, False
-        
+
         quad_incomplete = np.any(np.isnan(self._subject_quad))
         if quad_incomplete:
             quad_image = self._draw_subject_quad(image)
             return self._draw_focus_box(quad_image, quad_incomplete), False
-        
+
         if self._homography is None:
             xs = np.array(self._subject_quad)
             ys = np.array(self._focus_box)
@@ -595,7 +590,7 @@ class Lepton():
         shp = (image.shape[1], image.shape[0])
         warped_image = cv2.warpPerspective(image, self._homography, shp)
         return self._draw_focus_box(warped_image, quad_incomplete), True
-    
+
     def _time_2_hmsms(self, time_ms):
         hrs = time_ms/3600000.0
         mns = 60.0*(hrs-np.floor(hrs))
@@ -606,21 +601,21 @@ class Lepton():
         scs = int(np.floor(scs))
         mss = int(np.floor(mss))
         return hrs, mns, scs, mss
-        
+
     def _ffc_uptime_str(self):
         telemetry = self._telemetry_buffer[-1]
         d_time = telemetry['Uptime (ms)']-telemetry['Uptime at last FFC (ms)']
         _, mns, scs, _ =  self._time_2_hmsms(d_time)
         return "{:01d}:{:02d}".format(mns, scs)
-    
+
     def _uptime_str(self):
         telemetry = self._telemetry_buffer[-1]
         hrs, mns, scs, mss =  self._time_2_hmsms(telemetry['Uptime (ms)'])
         return"{:02d}:{:02d}:{:02d}.{:03d}".format(hrs, mns, scs, mss)
-    
+
     def _time_str(self):
         return "{} | {}".format(self._uptime_str(), self._ffc_uptime_str())
-    
+
     def _temperature_range_str(self):
         temperature_C = self._temperature_C_buffer[-1]
         warped_temperature_C = self._warp_element(temperature_C)
@@ -628,11 +623,11 @@ class Lepton():
         me = np.mean(warped_temperature_C)
         mx = np.max(warped_temperature_C)
         return "{:>6.2f} | {:>6.2f} | {:>6.2f} C".format(mn, me, mx)
-    
+
     def _fps_str(self):
         if len(self._telemetry_buffer)<self.BUFFER_SIZE:
             return 'FPS: ---'
-        
+
         frame_times = []
         for i in range(self.BUFFER_SIZE):
             telemetry = self._telemetry_buffer[i-self.BUFFER_SIZE]
@@ -643,16 +638,16 @@ class Lepton():
             delta = np.mean(np.diff(frame_times))*0.001
         if delta <= 0.0: return '---'
         return '{:.2f}'.format(1.0/delta)
-            
+
     def _telemetrize_image(self, image):
         shp = (image.shape[0]+30,image.shape[1],image.shape[2])
         telimg = np.zeros(shp).astype(np.uint8)
         telimg[:-30,:,:] = image
-        
+
         time_str = self._time_str()
         rng_str = self._temperature_range_str()
         fps_str = self._fps_str()
-        
+
         (tw,_), _ = cv2.getTextSize(time_str, cv2.FONT_HERSHEY_PLAIN, 1, 1)
         (fw,_), _ = cv2.getTextSize(fps_str, cv2.FONT_HERSHEY_PLAIN, 1, 1)
         (rw,_), _ = cv2.getTextSize(rng_str, cv2.FONT_HERSHEY_PLAIN, 1, 1)
@@ -662,38 +657,38 @@ class Lepton():
         uptime_pos = (1, telimg.shape[0]-10)
         fps_pos = (1+tw+s, telimg.shape[0]-10)
         range_pos = (1+tw+fw+2*s, telimg.shape[0]-10)
-        
-        telimg = cv2.putText(telimg, self._time_str(), uptime_pos, 
-                             cv2.FONT_HERSHEY_PLAIN , 1, (255,255,255), 1, 
+
+        telimg = cv2.putText(telimg, self._time_str(), uptime_pos,
+                             cv2.FONT_HERSHEY_PLAIN , 1, (255,255,255), 1,
                              cv2.LINE_AA)
-        telimg = cv2.putText(telimg, self._temperature_range_str(), range_pos, 
+        telimg = cv2.putText(telimg, self._temperature_range_str(), range_pos,
                              cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 1,
                              cv2.LINE_AA)
         telimg = cv2.putText(telimg, self._fps_str(), fps_pos,
                              cv2.FONT_HERSHEY_PLAIN , 1, (255,255,255), 1,
                              cv2.LINE_AA)
-        
+
         if self._telemetry_buffer[-1]['FFC state']=='imminent':
             telimg = cv2.rectangle(telimg,(5,5),(43,25),[0,0,0],-1)
             telimg = cv2.putText(telimg, "FFC", (10,21),
                                 cv2.FONT_HERSHEY_PLAIN , 1, (255,255,255), 1,
                                 cv2.LINE_AA)
         return telimg
-        
+
     def _get_show_image(self):
         image = copy(self._image_buffer[-1])
         mask = self._mask_buffer[-1]
         if not mask is None:
             image[mask] = [0,255,0]
-                
+
         shp = (image.shape[1]*self.SHOW_SCALE, image.shape[0]*self.SHOW_SCALE)
         image = cv2.resize(image, shp, interpolation=cv2.INTER_CUBIC)
-        
+
         show_im, warped = self._get_focus_box(image)
         rec_im = copy(show_im) if warped else image
         rec_im = self._telemetrize_image(rec_im)
         self._image_buffer[-1] = rec_im
-        
+
         if self._flag_recording:
             show_im = cv2.circle(show_im, (show_im.shape[1]-10,10), 5,
                                  [255,0,0], -1)
@@ -709,7 +704,7 @@ class Lepton():
         l5 = len(self._image_buffer)
         l6 = len(self._mask_buffer)
         if (l1==l2 and l2==l3 and l3==l4 and l4==l5 and l5==l6): return l1
-        
+
         msg = ("An error occured while validating buffer lengths. "
                "Frame number buffer: {}, Frame time buffer: {},"
                "Temperature buffer: {}, Telemetry buffer: {}, "
@@ -725,7 +720,7 @@ class Lepton():
         raise BufferLengthException(msg, payload=payload)
 
     def _trim_buffers(self):
-        for i in range(self.BUFFER_SIZE, self._buf_len()):
+        for _ in range(self.BUFFER_SIZE, self._buf_len()):
             self._frame_number_buffer.popleft()
             self._frame_time_buffer.popleft()
             self._temperature_C_buffer.popleft()
@@ -733,29 +728,31 @@ class Lepton():
             self._image_buffer.popleft()
             self._mask_buffer.popleft()
 
-    def _keypress_callback(self, wait=1):      
+    def _keypress_callback(self, wait=1):
         key = cv2.waitKeyEx(wait)
 
         if key == ord('f'):
             self._flag_focus_box = not self._flag_focus_box
-    
+
         if key == ord('r'):
-            self._subject_quad = [(np.nan,np.nan), (np.nan,np.nan), 
+            self._subject_quad = [(np.nan,np.nan), (np.nan,np.nan),
                                   (np.nan,np.nan), (np.nan,np.nan)]
             self._subject_next_vert = (np.nan,np.nan)
             self._homography = None
             self._scaled_homography = None
             self._inv_homography = None
             self._inv_scaled_homography = None
-    
+
         if key == 27:
             self._flag_streaming = False
 
     def _estop_stream(self):
         msg = "Emergency stopping stream... "
         print(ESC.fail(msg), end="", flush=True)
-        self._flag_emergency_stop = True
-        self._flag_streaming = False
+        with self._LOCK:
+            self._flag_emergency_stop = True
+            self._flag_streaming = False
+        time.sleep(2)
         cv2.destroyAllWindows()
         print(ESC.OKCYAN+"Stopped."+ESC.ENDC, flush=True)
 
@@ -768,8 +765,8 @@ class Lepton():
                 msg = "Stream emergency stopped before starting."
                 print(ESC.fail(msg), flush=True)
                 return
-            
-            cv2.namedWindow(self.WINDOW_NAME, cv2.WINDOW_AUTOSIZE) 
+
+            cv2.namedWindow(self.WINDOW_NAME, cv2.WINDOW_AUTOSIZE)
             cv2.setMouseCallback(self.WINDOW_NAME, self._mouse_callback)
             with self._LOCK:
                 self._flag_streaming = True
@@ -777,16 +774,18 @@ class Lepton():
             print(ESC.header(''.join(['-']*60)), flush=True)
             self._wall_epoch = time.time()
             self._frame_count = 0
-            while self._flag_streaming:
-                if self._flag_emergency_stop:
-                    with self._LOCK:
+            while True:
+                with self._LOCK:
+                    if not self._flag_streaming:
+                        break
+                    if self._flag_emergency_stop:
                         self._estop_stream()
-                    time.sleep(1.0) # Wait for other tasks out of thread
-                    print(ESC.header(''.join(['-']*60)), flush=True)
-                    print(ESC.header("Stream ended in emergency stop."), 
-                          flush=True)
-                    return
-                
+                        time.sleep(1.0) # Wait for other tasks out of thread
+                        print(ESC.header(''.join(['-']*60)), flush=True)
+                        print(ESC.header("Stream ended in emergency stop."),
+                              flush=True)
+                        return
+
                 res, temperature_C, telemetry = self.cap.read()
                 wall_dt = 1000.*(time.time()-self._wall_epoch)
                 wall_dt = int(np.round(wall_dt))
@@ -800,22 +799,22 @@ class Lepton():
                 if (telemetry['FFC state'] == 'never commanded' or
                     telemetry['FFC state'] == 'in progress'):
                     continue
-                
+
                 frame_num = telemetry['Frame count since reboot']
                 frame_tim = telemetry['Uptime (ms)']
                 with self._LOCK:
                     # Check for FFC in progress by un-updated frame number
-                    # or frame time or by very large frame number 
+                    # or frame time or by very large frame number
                     # (>48 hours of streaming)
-                    if ((self._buf_len()>0 and 
+                    if ((self._buf_len()>0 and
                         (self._frame_number_buffer[-1][0]==frame_num or
-                         self._frame_time_buffer[-1][0]==frame_tim)) or 
+                         self._frame_time_buffer[-1][0]==frame_tim)) or
                         frame_num > 1555200):
                         continue
-                    
+
                     self._frame_number_buffer.append((frame_num,
                                                       self._frame_count))
-                    self._frame_time_buffer.append((frame_tim, 
+                    self._frame_time_buffer.append((frame_tim,
                                                     wall_dt))
                     self._temperature_C_buffer.append(temperature_C)
                     self._telemetry_buffer.append(telemetry)
@@ -824,15 +823,15 @@ class Lepton():
                     image = self._get_show_image()
                     self._trim_buffers()
                     self._keypress_callback()
-                    
-                cv2.imshow(self.WINDOW_NAME, image) 
+
+                cv2.imshow(self.WINDOW_NAME, image)
                 self._frame_count += 1
-                
+
             cv2.destroyAllWindows()
         time.sleep(1.0) # Wait for other tasks out of thread
         print(ESC.header(''.join(['-']*60)), flush=True)
         print(ESC.header("Stream ended normally."), flush=True)
-    
+
     def _get_writable_frame(self, ignore_buf_min):
         buffer_length = self._buf_len()
         if (buffer_length <= self.BUFFER_SIZE and not ignore_buf_min or
@@ -849,53 +848,54 @@ class Lepton():
         mask = self._mask_buffer.popleft()
         if mask is None:
             mask = np.zeros(temperature_C.shape, dtype=bool)
-            
+
         if self._flag_focus_box and not self._homography is None:
             warped_temperature_C = self._warp_element(temperature_C)
             warped_temperature_cK = 100.*(warped_temperature_C+273.15)
             warped_mask = self._warp_element(mask)
-            return (frame_num, frame_time_ms, 
-                    temperature_cK, warped_temperature_cK, 
+            return (frame_num, frame_time_ms,
+                    temperature_cK, warped_temperature_cK,
                     telemetry, image,
                     mask, warped_mask,)
-        
+
         warped_temperature_cK = np.zeros(temperature_C.shape)
         warped_mask = np.zeros(temperature_C.shape, dtype=bool)
-        return (frame_num, frame_time_ms, 
+        return (frame_num, frame_time_ms,
                 temperature_cK, warped_temperature_cK,
                 telemetry, image,
                 mask, warped_mask)
-    
-    
+
+
     def _write_chunked_frame(self, frame_data, files):
         if all(d is None for d in frame_data): return
-        encoded = encode_frame_data(frame_data, ['L', 'L', 
-                                                 'H', 'H', 
+        encoded = encode_frame_data(frame_data, ['L', 'L',
+                                                 'H', 'H',
                                                  'U', 'B',
                                                  '?', '?'])
         for f, e in zip(files, encoded):
             msg_len = bytes('{:08d}'.format(len(e)), 'utf-8')
             f.write(msg_len + e)
-            
+
     def _estop_record(self):
         self._estop_stream()
         msg = "Emergency stopping record... "
         print(ESC.fail(msg), end="", flush=True)
-        self._flag_emergency_stop = True
-        self._flag_recording = False
+        with self._LOCK:
+            self._flag_emergency_stop = True
+            self._flag_recording = False
         print(ESC.OKCYAN+"Stopped."+ESC.ENDC, flush=True)
-    
-    def _get_valid_name(self, dirname):       
+
+    def _get_valid_name(self, dirname):
         if not os.path.exists(dirname): return dirname
-        
+
         max_append = 999
         for i in range(max_append):
             valid_dirname = '{}_{:03}'.format(dirname, i+1)
             if not os.path.exists(valid_dirname): return valid_dirname
-        
+
         msg = "Could not make file name \"{}\" valid.".format(dirname)
         raise InvalidNameException(msg, (dirname, max_append))
-    
+
     def _record(self, fps, detect_fronts, multiframe, equalize, dirpath):
         if dirpath is None:
             dirname =  'rec_data'
@@ -903,11 +903,11 @@ class Lepton():
             dirname = os.path.join(dirpath, 'rec_data')
         self.DIRPATH = self._get_valid_name(dirname)
         os.makedirs(self.DIRPATH, exist_ok=False)
-        fnames = ['frame_number.dat', 'frame_time.dat', 
+        fnames = ['frame_number.dat', 'frame_time.dat',
                   'temperature.dat', 'warped_temperature.dat',
-                  'telem.dat', 'image.dat', 
+                  'telem.dat', 'image.dat',
                   'mask.dat', 'warped_mask.dat']
-        
+
         with (Capture(self.PORT, fps, self.OVERLAY, self.DEBUG) as self.cap,
               open(os.path.join(self.DIRPATH, fnames[0]), 'wb') as fn_file,
               open(os.path.join(self.DIRPATH, fnames[1]), 'wb') as ft_file,
@@ -925,11 +925,11 @@ class Lepton():
                 print(ESC.fail(msg), flush=True)
                 return
 
-            files = (fn_file, ft_file, 
+            files = (fn_file, ft_file,
                      T_file, wT_file,
                      t_file, i_file,
                      m_file, wm_file, )
-            cv2.namedWindow(self.WINDOW_NAME, cv2.WINDOW_AUTOSIZE) 
+            cv2.namedWindow(self.WINDOW_NAME, cv2.WINDOW_AUTOSIZE)
             cv2.setMouseCallback(self.WINDOW_NAME, self._mouse_callback)
             with self._LOCK:
                 self._flag_streaming = True
@@ -938,16 +938,19 @@ class Lepton():
             print(ESC.header(''.join(['-']*60)), flush=True)
             self._wall_epoch = time.time()
             self._frame_count = 0
-            while self._flag_streaming:
-                if self._flag_emergency_stop:
-                    with self._LOCK:
+
+            while True:
+                with self._LOCK:
+                    if not self._flag_streaming:
+                        break
+                    if self._flag_emergency_stop:
                         self._estop_record()
-                    time.sleep(1.0) # Wait for other tasks out of thread
-                    print(ESC.header(''.join(['-']*60)), flush=True)
-                    print(ESC.header("Recording ended in emergency stop."),
-                          flush=True)
-                    return
-                
+                        time.sleep(1.0) # Wait for other tasks out of thread
+                        print(ESC.header(''.join(['-']*60)), flush=True)
+                        print(ESC.header("Recording ended in emergency stop."),
+                              flush=True)
+                        return
+
                 res, temperature_C, telemetry = self.cap.read()
                 wall_dt = 1000.*(time.time()-self._wall_epoch)
                 wall_dt = int(np.round(wall_dt))
@@ -961,22 +964,22 @@ class Lepton():
                 if (telemetry['FFC state'] == 'never commanded' or
                     telemetry['FFC state']=='in progress'):
                     continue
-                
+
                 frame_num = telemetry['Frame count since reboot']
                 frame_tim = telemetry['Uptime (ms)']
                 with self._LOCK:
                     # Check for FFC in progress by un-updated frame number
-                    # or frame time or by very large frame number 
+                    # or frame time or by very large frame number
                     # (>48 hours of streaming)
-                    if ((self._buf_len()>0 and 
+                    if ((self._buf_len()>0 and
                         (self._frame_number_buffer[-1][0]==frame_num or
-                         self._frame_time_buffer[-1][0]==frame_tim)) or 
+                         self._frame_time_buffer[-1][0]==frame_tim)) or
                         frame_num > 1555200):
                         continue
-                    
+
                     self._frame_number_buffer.append((frame_num,
                                                       self._frame_count))
-                    self._frame_time_buffer.append((frame_tim, 
+                    self._frame_time_buffer.append((frame_tim,
                                                     wall_dt))
                     self._temperature_C_buffer.append(temperature_C)
                     self._telemetry_buffer.append(telemetry)
@@ -985,22 +988,22 @@ class Lepton():
                     image = self._get_show_image()
                     frame_data = self._get_writable_frame(ignore_buf_min=False)
                     self._keypress_callback()
-                    
+
                 self._write_chunked_frame(frame_data, files)
-                cv2.imshow(self.WINDOW_NAME, image) 
+                cv2.imshow(self.WINDOW_NAME, image)
                 self._frame_count += 1
-                
+
             cv2.destroyAllWindows()
-            
+
             with self._LOCK:
                 term_frame_data = []
                 while self._buf_len() > 0:
                     frame_data = self._get_writable_frame(ignore_buf_min=True)
                     term_frame_data.append(frame_data)
-                self._flag_recording = False  
+                self._flag_recording = False
             for frame_data in term_frame_data:
                 self._write_chunked_frame(frame_data, files)
-            
+
         time.sleep(1.0) # Wait for other tasks out of thread
         print(ESC.header(''.join(['-']*60)), flush=True)
         print(ESC.header("Recording ended normally."), flush=True)
@@ -1010,37 +1013,37 @@ class Lepton():
             if not self._flag_emergency_stop:
                 self._flag_emergency_stop = True
                 msg="{}EMERGENCY STOP COMMAND RECEIVED{}"
-                print(msg.format(ESC.FAIL, ESC.ENDC), flush=True)        
+                print(msg.format(ESC.FAIL, ESC.ENDC), flush=True)
 
     def stop(self):
         with self._LOCK:
             self._flag_streaming = False
 
-    def start_stream(self, fps=None, detect_fronts=False, multiframe=True, 
+    def start_stream(self, fps=None, detect_fronts=False, multiframe=True,
                      equalize=False):
         res = safe_run(self._stream, self._estop_stream,
-                        args=(fps, detect_fronts, multiframe, equalize, ))   
+                        args=(fps, detect_fronts, multiframe, equalize, ))
         if res[0] < 0:
             time.sleep(1.0) # Wait for other tasks out of thread
             print(ESC.header(''.join(['-']*60)), flush=True)
             msg = "Streaming ended in emergency stop due to exception."
             print(ESC.header(msg),flush=True)
-            
+
         return res[0]
 
-    def start_record(self, fps=None, detect_fronts=False, multiframe=True, 
+    def start_record(self, fps=None, detect_fronts=False, multiframe=True,
                      equalize=False, dirpath=None):
-        res = safe_run(self._record, self._estop_record, 
-                       args=(fps, detect_fronts, 
+        res = safe_run(self._record, self._estop_record,
+                       args=(fps, detect_fronts,
                              multiframe, equalize, dirpath))
         if res[0] < 0:
             time.sleep(1.0) # Wait for other tasks out of thread
             print(ESC.header(''.join(['-']*60)), flush=True)
             msg = "Recording ended in emergency stop due to exception."
             print(ESC.header(msg),flush=True)
-            
+
         return res[0]
-    
+
     def _wait_until(self, condition, timeout_ms, dt_ms):
         epoch_s = time.time()
         timeout_s = 0.001*timeout_ms
@@ -1048,8 +1051,8 @@ class Lepton():
         while not condition():
             if (time.time()-epoch_s) > timeout_s:
                 string = "Function _wait_until({}) timed out at {} ms."
-                raise TimeoutException(string.format(condition.__name__, 
-                                                     timeout_ms), 
+                raise TimeoutException(string.format(condition.__name__,
+                                                     timeout_ms),
                                        timeout_s)
             time.sleep(dt_s)
             if self._flag_emergency_stop: break
@@ -1057,52 +1060,52 @@ class Lepton():
     def _buffers_populated(self):
         with self._LOCK:
             return self._buf_len() > 0
-    
+
     def wait_until_stream_active(self, timeout_ms=5000., dt_ms=25.):
         return safe_run(self._wait_until, args=(self._buffers_populated,
-                                                 timeout_ms, dt_ms))[0] 
-    
+                                                 timeout_ms, dt_ms))[0]
+
     def _frame_data_to_bytes(self, frame_data):
         frame_num = frame_data[0]
         frame_time_s = frame_data[1]
         temperature_C = frame_data[2]
         mask = frame_data[3]
-        
+
         if frame_num is None:
             b_frame_num = b''
         else:
             b_frame_num = self._encode(frame_num, np.uint32)[:-5]
-        
+
         if frame_time_s is None:
             b_frame_time_ms = b''
         else:
             b_frame_time_ms = [1000.*s for s in frame_time_s]
             b_frame_time_ms = self._encode(b_frame_time_ms, np.uint32)[:-5]
-        
+
         if temperature_C is None:
             b_temperature_cK = b''
         else:
             b_temperature_cK = 100.*(temperature_C+273.15)
             b_temperature_cK = self._encode(b_temperature_cK, np.uint16)[:-5]
-        
-        if mask is None: 
+
+        if mask is None:
             b_mask = b''
         else:
             b_mask = self._encode(mask, bool)[:-5]
-        
+
         return  (b_frame_num, b_frame_time_ms, b_temperature_cK, b_mask, )
 
     def _get_frame_data(self, focused_ok):
         with self._LOCK:
             if self._buf_len() == 0:
                 return (None, None, None, None, None, None, )
-            
+
             frame_num = copy(self._frame_number_buffer[-1])
             if (not np.isnan(self._frame_num_prev_send) and
                 frame_num[0] <= self._frame_num_prev_send):
                 return (None, None, None, None, None, None, )
             self._frame_num_prev_send = frame_num[0]
-            
+
             frame_time_ms = copy(self._frame_time_buffer[-1])
             temperature_C = copy(self._temperature_C_buffer[-1])
             temperature_cK = (100.*(temperature_C+273.15)).astype(np.uint16)
@@ -1112,32 +1115,31 @@ class Lepton():
             if mask is None:
                 mask = np.zeros(temperature_cK.shape, dtype=bool)
             is_warped = self._flag_focus_box and not self._homography is None
-            
+
         if not focused_ok or not is_warped:
             return (frame_num, frame_time_ms, temperature_cK,
                     telemetry, image, mask,)
-        
+
         warped_temperature_C = self._warp_element(temperature_C)
         warped_temperature_cK = 100.*(warped_temperature_C+273.15)
         warped_temperature_cK = np.round(warped_temperature_cK)
         warped_temperature_cK = warped_temperature_cK.astype(np.uint16)
         warped_mask = self._warp_element(mask)
-        
+
         return (frame_num, frame_time_ms, warped_temperature_cK,
                 telemetry, image, warped_mask,)
-    
+
     def get_frame_data(self, focused_ok=False, encoded=False):
         frame_data = self._get_frame_data(focused_ok)
         if encoded and not any([f is None for f in frame_data]):
-            frame_data = encode_frame_data(frame_data, 
+            frame_data = encode_frame_data(frame_data,
                                            ['L', 'L', 'H', 'U', 'B', '?'])
         return frame_data
-    
+
     def is_streaming(self):
         with self._LOCK:
             return copy(self._flag_streaming)
-    
+
     def is_recording(self):
         with self._LOCK:
             return copy(self._flag_recording)
-            

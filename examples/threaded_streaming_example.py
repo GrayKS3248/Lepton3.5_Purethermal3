@@ -7,20 +7,20 @@ from lepton import Videowriter
 
 
 # Global camera constants
-CAMERA_PORT = 0
+CAMERA_PORT = 1
 CMAP = 'black_hot'
-SCALE_FACTOR = 3
+SCALE_FACTOR = 5
 RECORD = False
 FPS = None
-DETECT = False
+DETECT = True
 MULTIFRAME = True
 EQUALIZE = False
 
 
 def initialize():
     # Initialize lepton camera
-    lepton = Lepton(CAMERA_PORT, CMAP, SCALE_FACTOR, False)
-    
+    lepton = Lepton(CAMERA_PORT, CMAP, SCALE_FACTOR)
+
     # Begin streaming in a thread
     args = (FPS, DETECT, MULTIFRAME, EQUALIZE)
     if RECORD:
@@ -33,13 +33,13 @@ def initialize():
 
 def main(lepton):
     # Wait until the stream is active
-    if lepton.wait_until_stream_active(timeout_ms=10000.0) < 0:
+    if lepton.wait_until_stream_active() < 0:
         lepton.emergency_stop()
-    
+
     # Stream the lepton data
     while lepton.is_streaming():
         frame_data = lepton.get_frame_data(focused_ok=True)
-        
+
         # These values will be None if attempt to get data from same frame
         frame_num = frame_data[0]
         frame_time_ms = frame_data[1]
@@ -51,7 +51,7 @@ def main(lepton):
 def terminate(thread):
     # Join the Lepton thread
     thread.join()
-    
+
     # Decode the recorded data
     if RECORD:
         writer = Videowriter()
@@ -59,10 +59,7 @@ def terminate(thread):
         return raw_data
 
 
-if __name__ == "__main__":   
+if __name__ == "__main__":
     lepton, thread = initialize()
     main(lepton)
     raw_data = terminate(thread)
-
-
-

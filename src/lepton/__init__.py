@@ -1,7 +1,7 @@
 # Submodules always needs to be imported to ensure registration
 from lepton.core import (Capture, # NOQA
                          Lepton,
-                         Detector,
+                         detect,
                          Videowriter,
                          encode_msg,
                          decode_msg,

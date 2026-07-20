@@ -40,6 +40,7 @@ dependencies = [
     "scipy",
     "opencv-python",
     "av",
+    "scikit-image",
 ]
 
 
