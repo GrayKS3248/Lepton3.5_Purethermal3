@@ -76,7 +76,7 @@ When you are finshed recording, press the `esc` while the viewing window is acti
 You can use the `-h` flag to explore addtional flags and functionality.
 
 ```
-(.venv) C:\Users\username> leprun -rleprun -h
+(.venv) C:\Users\username> leprun -h
 ```
 
 ### Coding Examples
