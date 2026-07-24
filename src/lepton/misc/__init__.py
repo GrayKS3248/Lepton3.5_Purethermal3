@@ -1,9 +1,17 @@
-from lepton.misc.cmaps import Cmaps
-from lepton.misc.utilities import (ESC,
-                                   print_exception,
-                                   safe_run,)
+# -*- coding: utf-8 -*-
+"""
+Subpackage: misc initialization.
 
-__all__ = ["Cmaps",
-           "ESC",
-           "print_exception",
-           "safe_run",]
+© Copyright, 2026 G. Schaer.
+SPDX-License-Identifier: GPL-3.0-only
+"""
+
+from .cmaps import Colormaps
+from .detection import detect_fp_fronts
+
+colormaps = Colormaps()
+
+__all__ = [
+    "colormaps",
+    "detect_fp_fronts",
+]

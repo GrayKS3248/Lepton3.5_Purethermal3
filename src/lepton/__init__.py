@@ -1,22 +1,20 @@
-# Submodules always needs to be imported to ensure registration
-from lepton.core import (Capture, # NOQA
-                         Lepton,
-                         detect,
-                         Videowriter,
-                         encode_msg,
-                         decode_msg,
-                         encode_frame_data,
-                         decode_frame_data,
-                         decode_recording_data,)
-from lepton.misc import (Cmaps, # NOQA
-                         ESC,
-                         print_exception,
-                         safe_run,)
-from lepton.comm import (Host, # NOQA
-                         Client,
-                         EOT,
-                         NULL,)
-from lepton.main import leprun # NOQA
+# -*- coding: utf-8 -*-
+"""
+Package initialization.
 
+© Copyright, 2026 G. Schaer.
+SPDX-License-Identifier: GPL-3.0-only
+"""
 
-__version__ = '0.3.b11'
+from .constants import *
+from .core.stream import Stream
+from .scripts import leprun
+
+__version__ = '1.0.0'
+
+__all__ = [
+    "Stream",
+    "leprun"
+]
+for _x in constants.__all__:
+    __all__.append(_x)
