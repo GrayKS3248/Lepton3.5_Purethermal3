@@ -8,99 +8,81 @@ SPDX-License-Identifier: GPL-3.0-only
 
 Software to run a FLIR Lepton 3.5 mounted on a Groupgets Purethermal3 board running in Windows.
 
-# Installation
+# Detailed Installation Instruction
 
-### From PyPi (Recommended)
+We strongly recommend installing this package in a virtual environment:
 
-It is recommended that you use either [Anaconda or Miniconda](https://www.anaconda.com/download/success).
-
-Run the commands below to create a fresh conda environment named lepton.
-
-```shell
-conda create -n lepton -y
-conda activate lepton
+```powershell
+C:\Users\username> python -m venv .venv
+C:\Users\username> .venv\Scripts\activate.bat
 ```
 
-Install `pip` in the environment.
+When done installing and using this package, deactivate the virtual environment with:
 
-```shell
-conda install pip -y
+```console
+(.venv) user@device:~$ deactivate
 ```
 
-Install `lepton-pt`
+### PyPi (Recommended)
+[python>=3.12](https://www.python.org/) and [pip](https://pip.pypa.io/en/stable/) are required.
 
-```shell
-pip install lepton-pt
+To install:
+
+```powershell
+(.venv) C:\Users\username> pip install lepton-pt
 ```
 
-### From Source
+### Source
+[python>=3.12](https://www.python.org/), [pip](https://pip.pypa.io/en/stable/), and [git](https://git-scm.com/) are required.
+To clone the repository:
 
-It is reccomended that you use either [Anaconda or Miniconda](https://www.anaconda.com/download/success).
-
-Run the commands below to create a fresh conda environment named lepton.
-
-```shell
-conda create -n lepton -y
-conda activate lepton
+```powershell
+(.venv) C:\Users\username> git clone https://github.com/GrayKS3248/Lepton3.5_Purethermal3.git
+(.venv) C:\Users\username> cd Lepton3.5_Purethermal3
 ```
 
-Install `pip` and `git` in the environment.
+To install:
 
-```shell
-conda install pip git -y
-```
-
-Clone the Lepton3.5_Purethermal3 repository.
-
-```git
-git clone https://github.com/GrayKS3248/Lepton3.5_Purethermal3.git
-```
-
-Navigate to the repository directory and install the package.
-
-```shell
-cd Lepton3.5_Purethermal3
-pip install -e .
+```powershell
+(.venv) C:\Users\username\condynsate> pip install -e .
 ```
 
 # Usage
 
 ### Streaming
 
-After the Lepton is seated in the Purethermal board and connected to a device via a USB-C, activate the Conda environment in which this package is installed and start streaming the camera using the `leprun` command.
+After the Lepton is seated in the Purethermal board and connected to a device via a USB-C, start streaming the camera using the `leprun` command.
 
-```shell
-conda activate lepton
-leprun
+```powershell
+(.venv) C:\Users\username> leprun
 ```
 
-When you are finshed streaming, press the `esc` while the viewer window is active to terminate the streaming.
+When you are finshed streaming, press the `esc` while the viewer window is active to terminate.
 
 ### Recording
 
-After the Lepton is seated in the Purethermal board and connected to a device via a USB-C, activate the Conda environment in which this package is installed and start streaming the camera using the `leprun` command and the `-r` flag.
+To record a stream, use the `-r` flag.
 
-```shell
-conda activate lepton
-leprun -r
+```powershell
+(.venv) C:\Users\username> leprun -r
 ```
 
-The `-r` flag indicates that you want to record what is being streamed. All generated data is saved in a subdirectory of the directory `Lepton_Recordings`. `Lepton_Recordings` is found in the active directory. After the recording is terminated, data is rendered into a `.mp4` video.
+All generated data is saved to the directory `Lepton_Recordings` which itself is generated in the active directory. After the recording is terminated, data is rendered into a `.mp4` video.
 
-When you are finshed recording, press the `esc` while the viewing window is active to terminate recording. Note that it will take some time after the recording is terminated to render the captured video.
+When you are finshed recording, press the `esc` while the viewing window is active to terminate. After termination, a background process will render the video. This may take several minutes depending on the length of the recording.
 
 ### Other
 
 You can use the `-h` flag to explore addtional flags and functionality.
 
 ```
-leprun -h
+(.venv) C:\Users\username> leprun -rleprun -h
 ```
 
 ### Coding Examples
 
-Example usage is given in the `examples` directory. 
+Example usage is given in [examples](https://github.com/GrayKS3248/Lepton3.5_Purethermal3/tree/main/examples).
 
 ### Lost Frames Every 3 Minutes
 
-The FLIR Lepton camera uses automatic flat field correction (FFC) during operation to ensure image fidelity and prevent pixel drift. These automatic FFCs occur every 3 minutes and are predicated by a box reading "FFC" in the top left corner of the viewing window. They last approximately 2 seconds during which no thermal or telemetry data are transmitted by the camera resulting in dropped frames. This is unavoidable for proper Lepton function. Note the renderer automatically detects the dropped frames and locally adjusts the frame rate to maintain true playback speed.
+The FLIR Lepton camera uses automatic flat [field correction (FFC)](https://en.wikipedia.org/wiki/Flat-field_correction) during operation to ensure image fidelity and prevent pixel drift. These automatic FFCs occur about every 3 minutes and are predicated by a box reading "FFC" in the top left corner of the viewing window. They last approximately 2 seconds during which time no data are transmitted by the camera. This results in unavoidable dropped frames.
