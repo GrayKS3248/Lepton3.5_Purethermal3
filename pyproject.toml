@@ -7,7 +7,7 @@ name = "lepton-pt"
 dynamic = ["version"]
 description = "Runs a FLIR Lepton 3.5 on a Purethermal3 in Windows."
 requires-python = ">=3.12"
-license = "GPL-3.0-only AND MIT"
+license = "GPL-3.0-only"
 license-files = ["COPYING",]
 keywords = [
     "FLIR",
@@ -42,6 +42,11 @@ dev = [
    "sphinx-rtd-theme",
    "nbsphinx",
 ]
+
+[project.urls]
+"Homepage" = "https://github.com/GrayKS3248/Lepton3.5_Purethermal3/"
+"Bug Reports" = "https://github.com/GrayKS3248/Lepton3.5_Purethermal3/issues/"
+"Source" = "https://github.com/GrayKS3248/Lepton3.5_Purethermal3/"
 
 [tool.setuptools.packages.find]
 where = ["src"]

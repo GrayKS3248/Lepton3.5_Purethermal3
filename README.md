@@ -60,7 +60,7 @@ Navigate to the repository directory and install the package.
 
 ```shell
 cd Lepton3.5_Purethermal3
-pip install . -e
+pip install -e .
 ```
 
 # Usage
