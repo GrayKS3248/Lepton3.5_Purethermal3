@@ -46,7 +46,7 @@ dev = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/GrayKS3248/Lepton3.5_Purethermal3/"
+"Homepage" = "https://grayks3248.github.io/Lepton3.5_Purethermal3/"
 "Bug Reports" = "https://github.com/GrayKS3248/Lepton3.5_Purethermal3/issues/"
 "Source" = "https://github.com/GrayKS3248/Lepton3.5_Purethermal3/"
 
