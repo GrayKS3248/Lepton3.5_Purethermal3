@@ -30,14 +30,10 @@ class FrameWriter:
     ----------
     opts: dict
         A dictionary of options defined at the start of a stream. Must include the keys
-        "dirpath": string
-            The path to the directory in which the frame archive is made.
-        "scale": float > 1
-            The scale of the viewer window. Used to properly size the image.
-        "cmap": matplotlib.colors.ListedColormap
-            The colormap used to colorize the image.
-        "record": bool
-            When True, adds a recording circle to the top right of the image.
+        "dirpath": string: The path to the directory in which the frame archive is made.
+        "scale": float > 1: The scale of the viewer window. Used to properly size the image.
+        "cmap": matplotlib.colors.ListedColormap: The colormap used to colorize the image.
+        "record": bool: When True, adds a recording circle to the top right of the image.
 
     Attributes
     ----------
@@ -112,16 +108,11 @@ class FrameWriter:
         ----------
         data: dict
             A dictionary containing the frame information. Must include the keys
-            "num": int
-                The frame number.
-            "time": int
-                The frame time in ms.
-            "temperature": ndarray
-                A float ndarray of the frame temperature in C.
-            "telemetry": dict
-                The frame telemetry
-            "mask": ndarray
-                A bool ndarray of the frame detection mask.
+            "num": int: The frame number.
+            "time": int: The frame time in ms.
+            "temperature": ndarray: A float ndarray of the frame temperature in C.
+            "telemetry": dict: The frame telemetry
+            "mask": ndarray: A bool ndarray of the frame detection mask.
 
         Returns
         -------
@@ -206,12 +197,9 @@ def makevideo(temperature, telemetry, mask, opts, path):
         A list of bool ndarrays of the frames' detection masks.
     opts: dict
         A dictionary of options defined at the start of a stream. Must include the keys
-        "scale": float > 1
-            The scale of the viewer window. Used to properly size the image.
-        "cmap": matplotlib.colors.ListedColormap
-            The colormap used to colorize the image.
-        "record": bool
-            When True, adds a recording circle to the top right of the image.
+        "scale": float > 1: The scale of the viewer window. Used to properly size image.
+        "cmap": matplotlib.colors.ListedColormap: The colormap used to colorize image.
+        "record": bool: When True, adds a recording circle to the top right of image.
     path: pathlib.Path
         The path of the video.
 

@@ -363,12 +363,9 @@ class ViewerImage:
         time since start of stream.
     opts: dict
         A dictionary of options defined at the start of a stream. Must include the keys
-        "scale": float > 1
-            The scale of the viewer window. Used to properly size the image.
-        "cmap": matplotlib.colors.ListedColormap
-            The colormap used to colorize the image.
-        "record": bool
-            When True, adds a recording circle to the top right of the image.
+        "scale": float > 1: The scale of the viewer window. Used to properly size the image.
+        "cmap": matplotlib.colors.ListedColormap: The colormap used to colorize the image.
+        "record": bool: When True, adds a recording circle to the top right of the image.
 
     """
     def __init__(self, temperature, telemetry, mask, t0, opts):
@@ -505,9 +502,8 @@ class ViewerImage:
         Returns
         -------
         image: ndarray
-            A uint8 ndarray of shape (lepton.WIDTH*self.scale,
-                                      lepton.HEIGHT*self.scale + lepton.TELEM_HEIGHT,
-                                      3).
+            A uint8 ndarray of shape 
+            (lepton.WIDTH*self.scale, lepton.HEIGHT*self.scale + lepton.TELEM_HEIGHT, 3).
 
         """
         return self._data
@@ -519,9 +515,8 @@ class ViewerImage:
         Returns
         -------
         image: ndarray
-            A float32 ndarray of shape (lepton.WIDTH*self.scale,
-                                        lepton.HEIGHT*self.scale + lepton.TELEM_HEIGHT,
-                                        3).
+            A float32 ndarray of shape 
+            (lepton.WIDTH*self.scale, lepton.HEIGHT*self.scale + lepton.TELEM_HEIGHT, 3).
 
         """
         return np.array(self._data, dtype=np.float32) / 255.0

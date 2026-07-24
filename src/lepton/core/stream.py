@@ -294,16 +294,11 @@ class Stream:
         -------
         frame_data: dict
             A dictionary containing the frame information. Includes the keys
-            "num": int
-                The frame number.
-            "time": int
-                The frame time in ms.
-            "temperature": ndarray
-                A float ndarray of the frame temperature in C.
-            "telemetry": dict
-                The frame telemetry
-            "mask": ndarray
-                A bool ndarray of the frame detection mask.
+            "num": int: The frame number.
+            "time": int: The frame time in ms.
+            "temperature": ndarray: A float ndarray of the frame temperature in C.
+            "telemetry": dict: The frame telemetry
+            "mask": ndarray: A bool ndarray of the frame detection mask.
 
         """
         with self._lock:
