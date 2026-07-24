@@ -6,7 +6,7 @@ SPDX-License-Identifier: GPL-3.0-only
 
 # Lepton3.5_Purethermal3
 
-Software to run a FLIR Lepton 3.5 mounted on a Groupgets Purethermal3 board running on Windows 10.
+Software to run a FLIR Lepton 3.5 mounted on a Groupgets Purethermal3 board running in Windows.
 
 # Installation
 
@@ -96,6 +96,10 @@ You can use the `-h` flag to explore addtional flags and functionality.
 ```
 leprun -h
 ```
+
+### Coding Examples
+
+Example usage is given in the `examples` directory. 
 
 ### Lost Frames Every 3 Minutes
 
