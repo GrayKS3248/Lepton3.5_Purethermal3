@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
+# © Copyright, 2026 G. Schaer.
+# SPDX-License-Identifier: GPL-3.0-only
 """
 Defines exception types to be used by the package.
-
-© Copyright, 2026 G. Schaer.
-SPDX-License-Identifier: GPL-3.0-only
 """
 
 class _DefaultException(Exception):

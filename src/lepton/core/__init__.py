@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
+# © Copyright, 2026 G. Schaer.
+# SPDX-License-Identifier: GPL-3.0-only
 """
 Subpackage: core initialization.
-
-© Copyright, 2026 G. Schaer.
-SPDX-License-Identifier: GPL-3.0-only
 """
 
 from .capture import CapFrame, Capture

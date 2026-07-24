@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
+# © Copyright, 2026 G. Schaer.
+# SPDX-License-Identifier: GPL-3.0-only
 """
 Subpackage: misc initialization.
-
-© Copyright, 2026 G. Schaer.
-SPDX-License-Identifier: GPL-3.0-only
 """
 
 from .cmaps import Colormaps

@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
+# © Copyright, 2026 G. Schaer.
+# SPDX-License-Identifier: GPL-3.0-only
 """
 Classes used to record camera stream and render video.
-
-© Copyright, 2026 G. Schaer.
-SPDX-License-Identifier: GPL-3.0-only
 """
 
 from threading import Thread

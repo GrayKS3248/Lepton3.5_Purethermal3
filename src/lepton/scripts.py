@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
+# © Copyright, 2026 G. Schaer.
+# SPDX-License-Identifier: GPL-3.0-only
 """
 Defines scripts.
-
-© Copyright, 2026 G. Schaer.
-SPDX-License-Identifier: GPL-3.0-only
 """
 
 import argparse

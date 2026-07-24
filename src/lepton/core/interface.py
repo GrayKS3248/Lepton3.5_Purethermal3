@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
+# © Copyright, 2026 G. Schaer.
+# SPDX-License-Identifier: GPL-3.0-only
 """
 Classes used to render camera stream.
-
-© Copyright, 2026 G. Schaer.
-SPDX-License-Identifier: GPL-3.0-only
 """
 
 from math import floor, ceil, isnan
@@ -502,7 +501,7 @@ class ViewerImage:
         Returns
         -------
         image: ndarray
-            A uint8 ndarray of shape 
+            A uint8 ndarray of shape
             (lepton.WIDTH*self.scale, lepton.HEIGHT*self.scale + lepton.TELEM_HEIGHT, 3).
 
         """
@@ -515,7 +514,7 @@ class ViewerImage:
         Returns
         -------
         image: ndarray
-            A float32 ndarray of shape 
+            A float32 ndarray of shape
             (lepton.WIDTH*self.scale, lepton.HEIGHT*self.scale + lepton.TELEM_HEIGHT, 3).
 
         """
