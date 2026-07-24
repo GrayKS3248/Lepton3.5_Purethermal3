@@ -13,14 +13,14 @@ Software to run a FLIR Lepton 3.5 mounted on a Groupgets Purethermal3 board runn
 We strongly recommend installing this package in a virtual environment:
 
 ```powershell
-C:\Users\username> python -m venv .venv
-C:\Users\username> .venv\Scripts\activate.bat
+python -m venv .venv
+.venv\Scripts\activate.bat
 ```
 
 When done installing and using this package, deactivate the virtual environment with:
 
 ```console
-(.venv) user@device:~$ deactivate
+deactivate
 ```
 
 ### PyPi (Recommended)
@@ -29,7 +29,7 @@ When done installing and using this package, deactivate the virtual environment 
 To install:
 
 ```powershell
-(.venv) C:\Users\username> pip install lepton-pt
+pip install lepton-pt
 ```
 
 ### Source
@@ -37,14 +37,14 @@ To install:
 To clone the repository:
 
 ```powershell
-(.venv) C:\Users\username> git clone https://github.com/GrayKS3248/Lepton3.5_Purethermal3.git
-(.venv) C:\Users\username> cd Lepton3.5_Purethermal3
+git clone https://github.com/GrayKS3248/Lepton3.5_Purethermal3.git
+cd Lepton3.5_Purethermal3
 ```
 
 To install:
 
 ```powershell
-(.venv) C:\Users\username\condynsate> pip install -e .
+pip install -e .
 ```
 
 # Usage
@@ -54,7 +54,7 @@ To install:
 After the Lepton is seated in the Purethermal board and connected to a device via a USB-C, start streaming the camera using the `leprun` command.
 
 ```powershell
-(.venv) C:\Users\username> leprun
+leprun
 ```
 
 When you are finshed streaming, press the `esc` while the viewer window is active to terminate.
@@ -64,7 +64,7 @@ When you are finshed streaming, press the `esc` while the viewer window is activ
 To record a stream, use the `-r` flag.
 
 ```powershell
-(.venv) C:\Users\username> leprun -r
+leprun -r
 ```
 
 All generated data is saved to the directory `Lepton_Recordings` which itself is generated in the active directory. After the recording is terminated, data is rendered into a `.mp4` video.
@@ -75,8 +75,8 @@ When you are finshed recording, press the `esc` while the viewing window is acti
 
 You can use the `-h` flag to explore addtional flags and functionality.
 
-```
-(.venv) C:\Users\username> leprun -h
+```powershell
+leprun -h
 ```
 
 ### Coding Examples
