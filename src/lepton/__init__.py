@@ -10,7 +10,7 @@ from .constants import *
 from .core.stream import Stream
 from .scripts import leprun
 
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 
 __all__ = [
     "Stream",
