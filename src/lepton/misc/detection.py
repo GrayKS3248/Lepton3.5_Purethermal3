@@ -10,7 +10,7 @@ import cv2
 from skimage.filters import (threshold_yen, threshold_multiotsu)
 from scipy.ndimage import gaussian_filter
 
-def detect_fp_fronts(ts, min_temp = 40.0):
+def detect_fp_fronts(ts, min_temp = 90.0):
     """
     Uses automatic thresholding of the temperature image, the gradient of the temperature image,
     and the time derivative of the temperature image sequence to estimate frontal polymerization
@@ -21,7 +21,7 @@ def detect_fp_fronts(ts, min_temp = 40.0):
     ts : list of array of floats, shape( (m,n) )
         Time ordered temperature images in Celcius.
     min_temp : float, optional
-        The minimum cutoff temperature for front definition in Celcius. The default is 50.
+        The minimum cutoff temperature for front definition in Celcius. The default is 90.
 
     Returns
     -------
