@@ -8,7 +8,6 @@ Defines scripts.
 import argparse
 import sys
 from lepton import Stream
-from lepton.misc import colormaps
 
 def _parse_args():
     parser = argparse.ArgumentParser()
@@ -76,7 +75,7 @@ def leprun(args = None):
     args = _parse_args()
 
     stream = Stream(args.dev_index)
-    stream.start(
+    stream(
         blocking = True,
         record = args.record,
         detect = args.detect,

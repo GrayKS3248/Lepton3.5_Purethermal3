@@ -99,6 +99,62 @@ class Stream:
             "complete": False,
         }
 
+    def __call__(self, **kwargs):
+        """
+        Starts the camera stream. Functionality is identical to Stream.start. Is useful for
+        context management.
+
+        Parameters
+        ----------
+        **kwargs
+
+        Keyword Args
+        ------------
+        blocking: bool
+            Whether to run the stream as a blocking thread (True) or a non-blocking thread (False).
+            The default is False.
+        record: bool
+             Whether to record the stream. The default is False.
+        detect: bool
+            Whether to detect frontal polymerization fronts. The default is False
+        cmap: string
+            The colormap used to color the frame data in the viewer window. The default is 'magma'
+        scale: float > 1
+            The scale of the viewer window compared to the camera temperature data. The default is 1
+        dirpath: string
+            The path to the directory in which the recording data is saved. The default is
+            'Lepton_Recordings'
+
+        Returns
+        -------
+        None.
+
+        Examples
+        --------
+        >>> import time
+        ... stream = Stream(0)
+        ... with stream(
+        ...         blocking = False,
+        ...         record = True,
+        ...         detect = False,
+        ...         cmap = "Greens_r",
+        ...         scale = 2,
+        ...         save_path = "DIRNAME"
+        ...     ) as s:
+        ...     for _ in range(10):
+        ...         frame_dat = s.get_frame()
+        ...         time.sleep(0.5)
+
+        """
+        self.start(**kwargs)
+        return self
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.terminate()
+
     def _reset(self):
         self._params["n0"] = None
         self._params["t0"] = None
@@ -268,6 +324,10 @@ class Stream:
             self._start(**kwargs)
             return
         Thread(target=self._start, kwargs=kwargs).start()
+
+        # Wait until stream is running to return
+        while not self.is_running() and not self.is_complete():
+            time.sleep(0.1)
 
     def is_running(self):
         """
