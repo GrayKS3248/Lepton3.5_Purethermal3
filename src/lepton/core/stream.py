@@ -255,7 +255,6 @@ class Stream:
                 frame = cap.read(homography = viewer.homography)
             except (CaptureException, CaptureTimeout, ShapeException) as e:
                 self._print_exception(e)
-                print("Safely shutting down. If recording, no data will be lost.", flush = True)
                 return
             self._process_frame(frame, viewer, opts)
 
