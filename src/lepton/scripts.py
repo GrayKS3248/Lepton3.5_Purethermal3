@@ -75,7 +75,7 @@ def leprun(args = None):
     args = _parse_args()
 
     stream = Stream(args.dev_index)
-    stream(
+    stream.start(
         blocking = True,
         record = args.record,
         detect = args.detect,
