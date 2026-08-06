@@ -266,7 +266,7 @@ class Capture():
 
         """
         # If the frame is captured during camera boot or FFC frame, ignore it and try again
-        for i in range(4):
+        for _ in range(4):
             frame = CapFrame(self._get_frame_data(), self._prev_time, homography = homography)
             if (not frame.telemetry["FFC state"] == "never commanded" and
                 not frame.telemetry["FFC state"] == "in progress"):

@@ -192,8 +192,8 @@ class Stream:
         time.sleep(0.05)
         return None
 
-    def _record_loop(self, opts):
-        with FrameWriter(opts) as writer:
+    def _record_loop(self, dirpath, cmap):
+        with FrameWriter(dirpath, cmap) as writer:
             while not self._done() or not self._bufs_empty():
                 data = self._bufs_popleft(1 if self._done() else 8)
                 writer.add(data)
@@ -266,7 +266,7 @@ class Stream:
                 "record": kwargs.get("record", False),
                 "detect": kwargs.get("detect", False),
                 "cmap": colormaps[kwargs.get("cmap", "magma")],
-                "scale": 4*max(kwargs.get("scale", 1), 1),
+                "scale": 4.0*max(min(kwargs.get("scale", 1.0), 2.0), 0.25),
                 "dirpath": kwargs.get("save_path", "Lepton_Recordings"),
             }
             with(
@@ -276,7 +276,10 @@ class Stream:
                 with self._lock:
                     self._flags["streaming"] = True
                 if opts["record"]:
-                    _record_thread = Thread(target=self._record_loop, args=(opts, ))
+                    _record_thread = Thread(
+                        target=self._record_loop,
+                        args=(opts["dirpath"], opts["cmap"], )
+                    )
                     _record_thread.start()
                 self._stream_loop(cap, viewer, opts)
 

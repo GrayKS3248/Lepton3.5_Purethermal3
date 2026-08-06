@@ -9,12 +9,12 @@ from threading import Thread
 from collections import deque
 from datetime import datetime
 from pathlib import Path
+from multiprocessing import Pool
 import zipfile
 import struct
 import os
 import json
 from compression import gzip
-from multiprocessing import Pool
 import cv2
 import numpy as np
 import lepton
@@ -27,12 +27,10 @@ class FrameWriter:
 
     Parameters
     ----------
-    opts: dict
-        A dictionary of options defined at the start of a stream. Must include the keys
-        "dirpath": string: The path to the directory in which the frame archive is made.
-        "scale": float > 1: The scale of the viewer window. Used to properly size the image.
-        "cmap": matplotlib.colors.ListedColormap: The colormap used to colorize the image.
-        "record": bool: When True, adds a recording circle to the top right of the image.
+    dirpath : string
+        The path to the directory in which the frame archive is made.
+    cmap : matplotlib.colors.ListedColormap
+        The colormap used to colorize the image.
 
     Attributes
     ----------
@@ -40,13 +38,13 @@ class FrameWriter:
         The coordinates of the corners of the ROI defined in viewer window coordinates.
 
     """
-    def __init__(self, opts):
-        parentpath = Path(opts["dirpath"])
+    def __init__(self, dirpath, cmap):
+        parentpath = Path(dirpath)
         parentpath.mkdir(parents=True, exist_ok=True)
         fname = Path(datetime.now().strftime("%Y-%m-%d_%H%M%S"))
         self._dirpath = parentpath / fname
         self._archive = None
-        self._opts = opts
+        self._cmap = cmap
         self._archive_fnames = deque([])
 
     def __enter__(self):
@@ -88,7 +86,7 @@ class FrameWriter:
             frames["temperature"],
             frames["telemetry"],
             frames["mask"],
-            self._opts,
+            self._cmap,
             self._dirpath / ("video.mp4")
         )
         for k, v in frames.items():
@@ -182,7 +180,7 @@ def _write_loop(frames, path):
     finally:
         out.release()
 
-def makevideo(temperature, telemetry, mask, opts, path):
+def makevideo(temperature, telemetry, mask, cmap, path):
     """
     Renders and saves a recording.
 
@@ -194,11 +192,8 @@ def makevideo(temperature, telemetry, mask, opts, path):
         A list of the frames' telemetries.
     mask: list[ndarray]
         A list of bool ndarrays of the frames' detection masks.
-    opts: dict
-        A dictionary of options defined at the start of a stream. Must include the keys
-        "scale": float > 1: The scale of the viewer window. Used to properly size image.
-        "cmap": matplotlib.colors.ListedColormap: The colormap used to colorize image.
-        "record": bool: When True, adds a recording circle to the top right of image.
+    cmap : matplotlib.colors.ListedColormap
+        The colormap used to colorize the frames.
     path: pathlib.Path
         The path of the video.
 
@@ -214,6 +209,11 @@ def makevideo(temperature, telemetry, mask, opts, path):
     frame_times = np.round(np.arange(0.0, round(temp_times[-1] + 100/3, 8), round(100/3, 8)), 4)
     temp_indices = frame_times[:, np.newaxis] - temp_times
     temp_indices = np.where(temp_indices > 0, temp_indices, np.inf).argmin(axis=1)
+    opts = {
+        "scale" : 4.0,
+        "cmap" : cmap,
+        "record" : False,
+    }
     frames = [(temperature[i], telemetry[i], mask[i], t0, opts) for i in temp_indices]
     thread = Thread(target=_write_loop, args=(frames, path, ))
     thread.start()

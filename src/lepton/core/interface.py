@@ -385,7 +385,7 @@ class ViewerImage:
                     tuple(round(x*scale) for x in arg.shape[::-1]),
                     interpolation = cv2.INTER_CUBIC
                 ))
-            except AttributeError, cv2.error:
+            except (AttributeError, cv2.error):
                 resized.append(None)
         return resized[0] if len(resized) == 1 else tuple(resized)
 
