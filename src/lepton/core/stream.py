@@ -101,8 +101,8 @@ class Stream:
 
     def __call__(self, **kwargs):
         """
-        Starts the camera stream. Functionality is identical to Stream.start. Is useful for
-        context management.
+        Starts the camera stream. Functionality is identical to Stream.start but only runs in
+        non-blocking mode. Is useful for context management.
 
         Parameters
         ----------
@@ -110,9 +110,6 @@ class Stream:
 
         Keyword Args
         ------------
-        blocking: bool
-            Whether to run the stream as a blocking thread (True) or a non-blocking thread (False).
-            The default is False.
         record: bool
              Whether to record the stream. The default is False.
         detect: bool
@@ -133,19 +130,13 @@ class Stream:
         --------
         >>> import time
         ... stream = Stream(0)
-        ... with stream(
-        ...         blocking = False,
-        ...         record = True,
-        ...         detect = False,
-        ...         cmap = "Greens_r",
-        ...         scale = 2,
-        ...         save_path = "DIRNAME"
-        ...     ) as s:
+        ... with stream() as s:
         ...     for _ in range(10):
         ...         frame_dat = s.get_frame()
         ...         time.sleep(0.5)
 
         """
+        kwargs["blocking"] = False
         self.start(**kwargs)
         return self
 
