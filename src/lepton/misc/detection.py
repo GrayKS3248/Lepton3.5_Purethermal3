@@ -10,6 +10,8 @@ import cv2
 from skimage.filters import (threshold_yen, threshold_multiotsu)
 from scipy.ndimage import gaussian_filter
 
+N_TEMPERATURE_CLASSES = 4
+
 def detect_fp_fronts(ts, min_temp = 80.0):
     """
     Uses automatic thresholding of the temperature image, the gradient of the temperature image,
@@ -51,14 +53,14 @@ def _get_t_mask(temp, min_temp):
     shape = max(temp.shape) // 30
     shape -= shape % 2 - 1
     t = cv2.GaussianBlur(temp, (shape, )*2, 0)
-    threshes = threshold_multiotsu(t[~np.isnan(t)], 4, nbins = 32)
+    threshes = threshold_multiotsu(t[~np.isnan(t)], N_TEMPERATURE_CLASSES, nbins = 32)
     m = (t >= threshes[0]) & (t <= threshes[-1])
 
     # Apply the minimum cutoff temperature
     return m & (t>min_temp)
 
 def _get_g_mask(temp):
-    # Get the L2 norm of the gradient of the temperature field
+    # Get the magnitude of the gradient of the temperature field
     dx, dy = np.gradient(temp)
     g = np.sqrt(dx * dx + dy * dy)
     shape = max(g.shape) // 30
@@ -78,4 +80,4 @@ def _get_dt_mask(temps):
     dt[dt < 0.0] = 0.0
 
     # Yen's method to maximize information entropy of mask
-    return dt > threshold_yen(dt[~np.isnan(dt)], nbins = 32)
+    return dt > threshold_yen(dt[~np.isnan(dt)], nbins = 512)
