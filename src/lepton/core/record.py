@@ -10,6 +10,7 @@ from collections import deque
 from datetime import datetime
 from pathlib import Path
 from multiprocessing import Pool
+from pickle import PicklingError
 import zipfile
 import struct
 import os
@@ -168,15 +169,28 @@ class FrameWriter:
 def _render_frame(frame):
     return cv2.cvtColor(ViewerImage(*frame).asuint8(), cv2.COLOR_BGR2RGB)
 
+def _write_rendered_frames(out, frames, rendered_frames):
+    cap_time = [f[1]["Uptime (ms)"] - f[3] for f in frames]
+    frame_time = np.round(np.arange(0.0, round(cap_time[-1] + 100/3, 8), round(100/3, 8)), 4)
+    cap_idx = frame_time[:, np.newaxis] - cap_time
+    cap_idx = np.where(cap_idx > 0, cap_idx, np.inf).argmin(axis = 1)
+    for i in cap_idx:
+        out.write(rendered_frames[i])
+
 def _write_loop(frames, path):
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     i0 = ViewerImage(*frames[0]).asuint8()
     out = cv2.VideoWriter(path, fourcc, 30, (i0.shape[1], i0.shape[0]))
+
     try:
         with Pool() as pool:
             rendered_frames = pool.map(_render_frame, frames)
-        for rendered_frame in rendered_frames:
-            out.write(rendered_frame)
+        _write_rendered_frames(out, frames, rendered_frames)
+
+    except (AttributeError, PicklingError):
+        rendered_frames = [_render_frame(frame) for frame in frames]
+        _write_rendered_frames(out, frames, rendered_frames)
+
     finally:
         out.release()
 
@@ -205,15 +219,11 @@ def makevideo(temperature, telemetry, mask, cmap, path):
     if len(temperature) < 1:
         return
     t0 = telemetry[0]["Uptime (ms)"]
-    temp_times = [t["Uptime (ms)"] - t0 for t in telemetry]
-    frame_times = np.round(np.arange(0.0, round(temp_times[-1] + 100/3, 8), round(100/3, 8)), 4)
-    temp_indices = frame_times[:, np.newaxis] - temp_times
-    temp_indices = np.where(temp_indices > 0, temp_indices, np.inf).argmin(axis=1)
     opts = {
         "scale" : 4.0,
         "cmap" : cmap,
         "record" : False,
     }
-    frames = [(temperature[i], telemetry[i], mask[i], t0, opts) for i in temp_indices]
+    frames = [(temp, telem, m, t0, opts) for (temp, telem, m) in zip(temperature, telemetry, mask)]
     thread = Thread(target=_write_loop, args=(frames, path, ))
     thread.start()
