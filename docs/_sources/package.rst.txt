@@ -32,7 +32,6 @@ The Homography Class
    :no-members:
 .. automethod:: lepton.core.Homography.add_vert
 .. automethod:: lepton.core.Homography.set
-.. automethod:: lepton.core.Homography.get
 .. automethod:: lepton.core.Homography.reset
 
 The Viewer Class

@@ -48,6 +48,7 @@
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">The Stream Class</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#lepton.Stream.__call__"><code class="docutils literal notranslate"><span class="pre">Stream.__call__()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#lepton.Stream.start"><code class="docutils literal notranslate"><span class="pre">Stream.start()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#lepton.Stream.is_running"><code class="docutils literal notranslate"><span class="pre">Stream.is_running()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#lepton.Stream.is_complete"><code class="docutils literal notranslate"><span class="pre">Stream.is_complete()</span></code></a></li>
@@ -95,6 +96,40 @@ to an onscreen viewer window and is optionally recorded.</p>
 <dd class="field-even"><p>int</p>
 </dd>
 </dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="lepton.Stream.__call__">
+<span class="sig-prename descclassname"><span class="pre">Stream.</span></span><span class="sig-name descname"><span class="pre">__call__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#lepton.Stream.__call__" title="Link to this definition"></a></dt>
+<dd><p>Starts the camera stream. Functionality is identical to Stream.start but only runs in
+non-blocking mode. Is useful for context management.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>**kwargs</strong></p>
+</dd>
+<dt class="field-even">Keyword Arguments<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>record</strong> (<em>bool</em>) – Whether to record the stream. The default is False.</p></li>
+<li><p><strong>detect</strong> (<em>bool</em>) – Whether to detect frontal polymerization fronts. The default is False</p></li>
+<li><p><strong>cmap</strong> (<em>string</em>) – The colormap used to color the frame data in the viewer window. The default is ‘magma’</p></li>
+<li><p><strong>scale</strong> (<em>float &gt; 1</em>) – The scale of the viewer window compared to the camera temperature data. The default is 1</p></li>
+<li><p><strong>dirpath</strong> (<em>string</em>) – The path to the directory in which the recording data is saved. The default is
+‘Lepton_Recordings’</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="gp">... </span><span class="n">stream</span> <span class="o">=</span> <span class="n">Stream</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">... </span><span class="k">with</span> <span class="n">stream</span><span class="p">()</span> <span class="k">as</span> <span class="n">s</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">):</span>
+<span class="gp">... </span>        <span class="n">frame_dat</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">get_frame</span><span class="p">()</span>
+<span class="gp">... </span>        <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.5</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="lepton.Stream.start">
 <span class="sig-prename descclassname"><span class="pre">Stream.</span></span><span class="sig-name descname"><span class="pre">start</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#lepton.Stream.start" title="Link to this definition"></a></dt>

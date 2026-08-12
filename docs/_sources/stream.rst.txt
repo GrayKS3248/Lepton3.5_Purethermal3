@@ -4,6 +4,7 @@ The Stream Class
 ----------------
 .. automodule:: lepton.Stream
    :no-members:
+.. automethod:: lepton.Stream.__call__
 .. automethod:: lepton.Stream.start
 .. automethod:: lepton.Stream.is_running
 .. automethod:: lepton.Stream.is_complete

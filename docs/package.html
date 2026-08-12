@@ -123,7 +123,7 @@
 <h4>The CapFrame Class<a class="headerlink" href="#the-capframe-class" title="Link to this heading"></a></h4>
 <dl class="py class">
 <dt class="sig sig-object py" id="lepton.core.CapFrame">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">lepton.core.</span></span><span class="sig-name descname"><span class="pre">CapFrame</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frame_times</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">deque</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">homography</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">temperature</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">telemetry</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">&lt;factory&gt;</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#lepton.core.CapFrame" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">lepton.core.</span></span><span class="sig-name descname"><span class="pre">CapFrame</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frame_times</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">deque</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">homography</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple(np.ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">np.ndarray)</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">None)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">temperature</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">telemetry</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">&lt;factory&gt;</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#lepton.core.CapFrame" title="Link to this definition"></a></dt>
 <dd><p>Stores raw and decoded captured Lepton frame data.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -175,12 +175,15 @@ data after decoding. When None, no homography is applied. The default is None.</
 
 <dl class="py method">
 <dt class="sig sig-object py" id="lepton.core.Capture.read">
-<span class="sig-prename descclassname"><span class="pre">Capture.</span></span><span class="sig-name descname"><span class="pre">read</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">homography</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#lepton.core.Capture.read" title="Link to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">Capture.</span></span><span class="sig-name descname"><span class="pre">read</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">homography</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(None,</span> <span class="pre">None)</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#lepton.core.Capture.read" title="Link to this definition"></a></dt>
 <dd><p>Captures and decodes the current Lepton frame.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>homography</strong> (<em>ndarray</em><em>, </em><em>optional</em>) – A float ndarray that defines a homography transform to apply to the captured temperature
-data after decoding. When None, no homography is applied. The default is None.</p>
+<dd class="field-odd"><p><strong>homography</strong> (<em>tuple</em><em> of </em><em>(</em><em>ndarray</em><em>, </em><em>list</em><em> of </em><em>tuples</em><em>)</em><em>, </em><em>optional</em>) – First element: a float ndarray that defines a homography transform to apply to the
+captured temperature data after decoding. When None, no homography is applied.
+The default is None.
+Second element: the destination coordinates of the ROI’s corners defined in raw
+temperature coordinates. The default is None.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p><strong>frame_data</strong> – The captured and decoded frame data.</p>
@@ -227,10 +230,37 @@ data after decoding. When None, no homography is applied. The default is None.</
 <dl class="py attribute">
 <dt class="sig sig-object py" id="lepton.core.Homography.src_verts">
 <span class="sig-name descname"><span class="pre">src_verts</span></span><a class="headerlink" href="#lepton.core.Homography.src_verts" title="Link to this definition"></a></dt>
-<dd><p>The coordinates of the corners of the ROI defined in viewer window coordinates.</p>
+<dd><p>The source coordinates of the ROI’s corners defined in viewer window coordinates.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type<span class="colon">:</span></dt>
 <dd class="field-odd"><p>list of tuples</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="lepton.core.Homography.dst_points">
+<span class="sig-name descname"><span class="pre">dst_points</span></span><a class="headerlink" href="#lepton.core.Homography.dst_points" title="Link to this definition"></a></dt>
+<dd><p>The destination coordinates of the ROI’s corners defined in raw temperature coordinates.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list of tuples</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="lepton.core.Homography.value">
+<span class="sig-name descname"><span class="pre">value</span></span><a class="headerlink" href="#lepton.core.Homography.value" title="Link to this definition"></a></dt>
+<dd><p>A 3x3 float ndarray that defines a homography that takes a user defined region of
+interest quadrilateral to a rectangle. The rectangle has user defined aspect ratio and
+is aligned with the axes of the viewer. Its first vertex is in the top left of the
+viewer and all other vertices follow CCW. When no valid roi is locked, has a value of
+None. Scaled to be applied directly to temperature data (lepton.WIDTH, lepton.HEIGHT),
+not to image data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>3 x 3 ndarray</p>
 </dd>
 </dl>
 </dd></dl>
@@ -264,25 +294,6 @@ data after decoding. When None, no homography is applied. The default is None.</
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
 <dd class="field-even"><p>None.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="lepton.core.Homography.get">
-<span class="sig-prename descclassname"><span class="pre">Homography.</span></span><span class="sig-name descname"><span class="pre">get</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#lepton.core.Homography.get" title="Link to this definition"></a></dt>
-<dd><p>Gets the homography transform.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>homography_value</strong> – A 3x3 float ndarray that defines a homography that takes a user defined region of
-interest quadrilateral to a rectangle. The rectangle has user defined aspect ratio and
-is aligned with the axes of the viewer. Its first vertex is in the top left of the
-viewer and all other vertices follow CCW. When no valid roi is locked, has a value of
-None. Scaled to be applied directly to temperature data (lepton.WIDTH, lepton.HEIGHT),
-not to image data.</p>
-</dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p>ndarray</p>
 </dd>
 </dl>
 </dd></dl>
@@ -402,16 +413,15 @@ time since start of stream.</p></li>
 <h4>The FrameWriter Class<a class="headerlink" href="#the-framewriter-class" title="Link to this heading"></a></h4>
 <dl class="py class">
 <dt class="sig sig-object py" id="lepton.core.FrameWriter">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">lepton.core.</span></span><span class="sig-name descname"><span class="pre">FrameWriter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">opts</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#lepton.core.FrameWriter" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">lepton.core.</span></span><span class="sig-name descname"><span class="pre">FrameWriter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dirpath</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cmap</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#lepton.core.FrameWriter" title="Link to this definition"></a></dt>
 <dd><p>Writes frame information to zip archive during camera stream and then extracts and deletes that
 archive when streaming is done</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>opts</strong> (<em>dict</em>) – A dictionary of options defined at the start of a stream. Must include the keys
-“dirpath”: string: The path to the directory in which the frame archive is made.
-“scale”: float &gt; 1: The scale of the viewer window. Used to properly size the image.
-“cmap”: matplotlib.colors.ListedColormap: The colormap used to colorize the image.
-“record”: bool: When True, adds a recording circle to the top right of the image.</p>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dirpath</strong> (<em>string</em>) – The path to the directory in which the frame archive is made.</p></li>
+<li><p><strong>cmap</strong> (<em>matplotlib.colors.ListedColormap</em>) – The colormap used to colorize the image.</p></li>
+</ul>
 </dd>
 </dl>
 <dl class="py attribute">
@@ -473,7 +483,7 @@ archive when streaming is done</p>
 <h4>The makevideo Function<a class="headerlink" href="#the-makevideo-function" title="Link to this heading"></a></h4>
 <dl class="py function">
 <dt class="sig sig-object py" id="lepton.core.makevideo">
-<span class="sig-prename descclassname"><span class="pre">lepton.core.</span></span><span class="sig-name descname"><span class="pre">makevideo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">temperature</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">telemetry</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mask</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">opts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#lepton.core.makevideo" title="Link to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">lepton.core.</span></span><span class="sig-name descname"><span class="pre">makevideo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">temperature</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">telemetry</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mask</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cmap</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#lepton.core.makevideo" title="Link to this definition"></a></dt>
 <dd><p>Renders and saves a recording.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -481,10 +491,7 @@ archive when streaming is done</p>
 <li><p><strong>temperature</strong> (<em>list</em><em>[</em><em>ndarray</em><em>]</em>) – A list of float ndarrays of the frames’ temperatures in C.</p></li>
 <li><p><strong>telemetry</strong> (<em>list</em><em>[</em><em>dict</em><em>]</em>) – A list of the frames’ telemetries.</p></li>
 <li><p><strong>mask</strong> (<em>list</em><em>[</em><em>ndarray</em><em>]</em>) – A list of bool ndarrays of the frames’ detection masks.</p></li>
-<li><p><strong>opts</strong> (<em>dict</em>) – A dictionary of options defined at the start of a stream. Must include the keys
-“scale”: float &gt; 1: The scale of the viewer window. Used to properly size image.
-“cmap”: matplotlib.colors.ListedColormap: The colormap used to colorize image.
-“record”: bool: When True, adds a recording circle to the top right of image.</p></li>
+<li><p><strong>cmap</strong> (<em>matplotlib.colors.ListedColormap</em>) – The colormap used to colorize the frames.</p></li>
 <li><p><strong>path</strong> (<em>pathlib.Path</em>) – The path of the video.</p></li>
 </ul>
 </dd>
@@ -568,7 +575,7 @@ archive when streaming is done</p>
 <dd class="field-even"><p>The value of the item with the specified key.</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>value</p>
+<dd class="field-odd"><p><a class="reference internal" href="#lepton.core.Homography.value" title="lepton.core.Homography.value">value</a></p>
 </dd>
 </dl>
 </dd></dl>
@@ -625,7 +632,7 @@ as tuples in a list.</p>
 <h4>The detect_fp_fronts Function<a class="headerlink" href="#the-detect-fp-fronts-function" title="Link to this heading"></a></h4>
 <dl class="py function">
 <dt class="sig sig-object py" id="lepton.misc.detect_fp_fronts">
-<span class="sig-prename descclassname"><span class="pre">lepton.misc.</span></span><span class="sig-name descname"><span class="pre">detect_fp_fronts</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_temp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">40.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#lepton.misc.detect_fp_fronts" title="Link to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">lepton.misc.</span></span><span class="sig-name descname"><span class="pre">detect_fp_fronts</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_temp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">80.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#lepton.misc.detect_fp_fronts" title="Link to this definition"></a></dt>
 <dd><p>Uses automatic thresholding of the temperature image, the gradient of the temperature image,
 and the time derivative of the temperature image sequence to estimate frontal polymerization
 front location.</p>
@@ -633,7 +640,7 @@ front location.</p>
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>ts</strong> (<em>list</em><em> of </em><em>array</em><em> of </em><em>floats</em><em>, </em><em>shape</em><em>( </em><em>(</em><em>m</em><em>,</em><em>n</em><em>) </em><em>)</em>) – Time ordered temperature images in Celcius.</p></li>
-<li><p><strong>min_temp</strong> (<em>float</em><em>, </em><em>optional</em>) – The minimum cutoff temperature for front definition in Celcius. The default is 50.</p></li>
+<li><p><strong>min_temp</strong> (<em>float</em><em>, </em><em>optional</em>) – The minimum cutoff temperature for front definition in Celcius. The default is 80.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
