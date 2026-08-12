@@ -41,7 +41,7 @@ class CapFrame:
     """
     raw_data: np.ndarray
     frame_times: deque
-    homography: np.ndarray = None
+    homography: tuple(np.ndarray, np.ndarray) = (None, None)
     temperature: np.ndarray = field(default_factory = lambda: np.ndarray(0))
     telemetry: dict = field(default_factory = dict)
 
@@ -62,21 +62,26 @@ class CapFrame:
     def _get_temperature(self):
         temperature = self.raw_data[:-2].astype(np.float32) * 0.01 - 273.15
         self.temperature = self._denoise(temperature)
-        if not self.homography is None:
+        if not any(h is None for h in self.homography):
             self.temperature = cv2.warpPerspective(
                 self.temperature,
-                self.homography,
+                self.homography[0],
                 lepton.SHAPE,
                 flags=cv2.INTER_CUBIC,
                 borderMode=cv2.BORDER_REFLECT)
             mask = cv2.warpPerspective(
                 np.ones(lepton.SHAPE[::-1]),
-                self.homography,
+                self.homography[0],
                 lepton.SHAPE,
                 flags=cv2.INTER_NEAREST,
                 borderMode=cv2.BORDER_CONSTANT,
                 borderValue=0
             )
+            corners = np.round(self.homography[1]).astype(np.int32)
+            mask[0:corners[0, 1], :] = 0
+            mask[corners[1, 1] + 1:, :] = 0
+            mask[:, 0:corners[0, 0]] = 0
+            mask[:, corners[2, 0] + 1:] = 0
             self.temperature[mask == 0] = float('nan')
 
     def _unpack(self):
@@ -242,15 +247,18 @@ class Capture():
         """
         self._cap.release()
 
-    def read(self, homography = None):
+    def read(self, homography = (None, None)):
         """
         Captures and decodes the current Lepton frame.
 
         Parameters
         ----------
-        homography: ndarray, optional
-            A float ndarray that defines a homography transform to apply to the captured temperature
-            data after decoding. When None, no homography is applied. The default is None.
+        homography: tuple of (ndarray, list of tuples), optional
+            First element: a float ndarray that defines a homography transform to apply to the
+            captured temperature data after decoding. When None, no homography is applied.
+            The default is None.
+            Second element: the destination coordinates of the ROI's corners defined in raw
+            temperature coordinates. The default is None.
 
         Returns
         -------

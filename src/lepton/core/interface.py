@@ -25,23 +25,33 @@ class Homography:
     Attributes
     ----------
     src_verts : list of tuples
-        The coordinates of the corners of the ROI defined in viewer window coordinates.
+        The source coordinates of the ROI's corners defined in viewer window coordinates.
+    dst_points : list of tuples
+        The destination coordinates of the ROI's corners defined in raw temperature coordinates.
+    value : 3 x 3 ndarray
+        A 3x3 float ndarray that defines a homography that takes a user defined region of
+        interest quadrilateral to a rectangle. The rectangle has user defined aspect ratio and
+        is aligned with the axes of the viewer. Its first vertex is in the top left of the
+        viewer and all other vertices follow CCW. When no valid roi is locked, has a value of
+        None. Scaled to be applied directly to temperature data (lepton.WIDTH, lepton.HEIGHT),
+        not to image data.
 
     """
     def __init__(self, scale):
         self._scale = scale
         self._value = None
         self._time_set = None
-        self._src_verts = [None, ] * 4
+        self._src_verts = [None, None, None, None]
+        self._dst_pts = None
 
-    def _src_pts(self):
+    def _get_src_pts(self):
         width_factor = (lepton.WIDTH - 1) / (self._scale * lepton.WIDTH - 1)
         height_factor = (lepton.HEIGHT - 1) / (self._scale * lepton.HEIGHT - 1)
         pts = [(min(max(v[0] * width_factor, 0), lepton.WIDTH - 1),
                 min(max(v[1] * height_factor, 0), lepton.HEIGHT - 1)) for v in self._src_verts]
         return np.array(pts, dtype=np.float32)
 
-    def _dst_pts(self, dst_ar):
+    def _get_dst_pts(self, dst_ar):
         if lepton.WIDTH / dst_ar <= lepton.HEIGHT:
             w_dst = lepton.WIDTH
             h_dst = w_dst / dst_ar
@@ -57,9 +67,34 @@ class Homography:
     @property
     def src_verts(self):
         """
-        The coordinates of the corners of the ROI defined in viewer window coordinates.
+        The source coordinates of the ROI's corners defined in viewer window coordinates.
         """
         return self._src_verts
+
+    @property
+    def dst_points(self):
+        """
+        The destination coordinates of the ROI's corners defined in raw temperature coordinates.
+        """
+        return self._dst_pts
+
+    @property
+    def value(self):
+        """
+        A 3x3 float ndarray that defines a homography that takes a user defined region of
+        interest quadrilateral to a rectangle. The rectangle has user defined aspect ratio and
+        is aligned with the axes of the viewer. Its first vertex is in the top left of the
+        viewer and all other vertices follow CCW. When no valid roi is locked, has a value of
+        None. Scaled to be applied directly to temperature data (lepton.WIDTH, lepton.HEIGHT),
+        not to image data.
+        """
+        try:
+            p = min((time.monotonic() - self._time_set) / 2.0, 1.0)
+            if p >= 1.0:
+                return self._value
+            return (1.0 - p) * np.eye(3) + p * self._value
+        except TypeError:
+            return None
 
     def add_vert(self, x, y):
         """
@@ -98,7 +133,8 @@ class Homography:
         """
         if dst_ar <= 0.0 or None in self._src_verts:
             return
-        self._value = cv2.findHomography(self._src_pts(), self._dst_pts(dst_ar))[0]
+        self._dst_pts = self._get_dst_pts(dst_ar)
+        self._value = cv2.findHomography(self._get_src_pts(), self._dst_pts)[0]
         self._time_set = time.monotonic()
 
     def reset(self):
@@ -112,29 +148,8 @@ class Homography:
         """
         self._value = None
         self._time_set = None
-        self._src_verts = [None, ] * 4
-
-    def get(self):
-        """
-        Gets the homography transform.
-
-        Returns
-        -------
-        homography_value: ndarray
-            A 3x3 float ndarray that defines a homography that takes a user defined region of
-            interest quadrilateral to a rectangle. The rectangle has user defined aspect ratio and
-            is aligned with the axes of the viewer. Its first vertex is in the top left of the
-            viewer and all other vertices follow CCW. When no valid roi is locked, has a value of
-            None. Scaled to be applied directly to temperature data (lepton.WIDTH, lepton.HEIGHT),
-            not to image data.
-        """
-        try:
-            p = min((time.monotonic() - self._time_set) / 2.0, 1.0)
-            if p >= 1.0:
-                return self._value
-            return (1.0 - p) * np.eye(3) + p * self._value
-        except TypeError:
-            return None
+        self._src_verts = [None, None, None, None]
+        self._dst_pts = None
 
 @dataclass
 class Viewer:
@@ -243,7 +258,7 @@ class Viewer:
         # When enter is pressed in set ROI mode, calculate the homography
         elif key == 13 and self._show_src:
             self._homography.set(self._get_ar())
-            if not self._homography.get() is None:
+            if not self._homography.value is None:
                 self._show_src = False
 
         # When ESC is pressed, inform user via callback return, other return nothing
@@ -261,7 +276,7 @@ class Viewer:
             self._homography.add_vert(x, y)
 
     def _draw_src(self, image):
-        if not self._show_src or not self._homography.get() is None:
+        if not self._show_src or not self._homography.value is None:
             return
         lines = [self._homography.src_verts[:-1], self._homography.src_verts[1:]]
         try:
@@ -282,7 +297,7 @@ class Viewer:
             cv2.circle(image, l[1], 5, (0, 255, 0), 2)
 
     def _draw_dst(self, image):
-        if not self._show_src or not self._homography.get() is None:
+        if not self._show_src or not self._homography.value is None:
             return
         txt = f"ROI AR: {self._get_ar():.02f}"
         (width, height), baseline = cv2.getTextSize(txt, cv2.FONT_HERSHEY_PLAIN, 1, 1)
@@ -301,14 +316,17 @@ class Viewer:
     @property
     def homography(self):
         """
+        First element:
         A 3x3 float ndarray that defines a homography that takes a user defined region of interest
         quadrilateral to a rectangle. The rectangle has user defined aspect ratio and is aligned
         with the axes of the viewer. Its first vertex is in the top left of the viewer and all
         other vertices follow CCW. When no valid roi is locked, has a value of None. Scaled to be
         applied directly to temperature data (lepton.WIDTH, lepton.HEIGHT), not to image data
         (lepton.WIDTH*self.scale, lepton.HEIGHT*self.scale + lepton.TELEM_HEIGHT).
+        Second element:
+        The destination coordinates of the ROI's corners defined in raw temperature coordinates.
         """
-        return self._homography.get()
+        return (self._homography.value, self._homography.dst_points)
 
     def imshow(self, image):
         """
